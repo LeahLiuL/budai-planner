@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>布袋船排计划工具 v2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Microsoft YaHei","Segoe UI",sans-serif;background:#e8ecf1;color:#222;padding:16px;max-width:1500px;margin:auto}
+
+h1{font-size:20px;margin-bottom:2px}
+.sub{color:#888;font-size:12px;margin-bottom:14px}
+
+/* Toolbar */
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+.btn:hover{opacity:.88}
+.btn-blue{background:#1565c0;color:#fff}.btn-green{background:#2e7d32;color:#fff}.btn-orange{background:#e65100;color:#fff}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* Upload Zone */
+.upload-zone{text-align:center;padding:24px;border:2px dashed #bbb;border-radius:8px;background:#fafafa;cursor:pointer;transition:.2s;margin-bottom:14px}
+.upload-zone:hover{border-color:#1565c0;background:#e3f2fd}
+.upload-zone .icon{font-size:32px;margin-bottom:6px}
+
+/* Stats Bar */
+.stats-bar{display:flex;gap:16px;padding:12px 18px;background:#fff;border-radius:8px;margin-bottom:14px;flex-wrap:wrap}
+.stat-item{text-align:center;min-width:70px}
+.stat-num{font-size:22px;font-weight:bold;color:#1565c0}
+.stat-lbl{font-size:11px;color:#666;margin-top:2px}
+.stat-red .stat-num{color:#c62828}
+.stat-green .stat-num{color:#2e7d32}
+.stat-org .stat-num{color:#e65100}
+
+/* ===== MAIN THREE-COLUMN LAYOUT ===== */
+.pipeline{display:grid;grid-template-columns:320px 1fr 340px;gap:12px;min-height:500px}
+
+/* Column headers */
+.col-header{padding:10px 14px;border-radius:8px 8px 0 0;font-weight:bold;font-size:14px;display:flex;align-items:center;gap:6px}
+.col-left-header{background:linear-gradient(135deg,#1565c0,#1976d2);color:#fff}
+.col-mid-header{background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff}
+.col-right-header{background:linear-gradient(135deg,#e65100,#ef6c00);color:#fff}
+.col-body{background:#fff;border-radius:0 0 8px 8px;padding:12px;min-height:400px;overflow-y:auto;max-height:calc(100vh - 260px)}
+
+/* Ship Cards */
+.ship-card{border:1px solid #e0e0e0;border-radius:8px;padding:10px 12px;margin-bottom:8px;transition:.15s;position:relative}
+.ship-card:hover{border-color:#90caf9;box-shadow:0 2px 8px rgba(21,101,192,.1)}
+.ship-card.assigned{border-left:4px solid #4caf50}
+.ship-card.partial{border-left:4px solid #ff9800}
+.ship-card.unassigned{border-left:4px solid #c62828;background:#fff8e1}
+
+.card-name{font-weight:bold;font-size:13px;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.card-svc{font-size:11px;color:#888;background:#f5f5f5;padding:1px 6px;border-radius:3px}
+.card-row{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
+.card-label{color:#666}
+.card-val{font-weight:600}
+
+/* Match tag (color number badge) */
+.match-tag{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;font-size:11px;font-weight:bold;color:#fff;flex-shrink:0}
+
+/* BSA Bar */
+.bsa-bar-wrap{width:100%;height:14px;background:#eee;border-radius:7px;overflow:hidden;margin-top:4px;position:relative}
+.bsa-bar-fill{height:100%;border-radius:7px;transition:width .3s}
+.bsa-text{position:absolute;top:-1px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:bold;color:#333;text-shadow:0 0 2px #fff}
+
+/* Middle column - timeline */
+.timeline-area{padding:8px 0}
+.time-axis{display:flex;justify-content:space-between;padding:6px 0;border-bottom:2px solid #e0e0e0;margin-bottom:8px;position:relative}
+.time-tick{font-size:11px;color:#888;text-align:center;flex:1;position:relative}
+.time-tick::after{content:'';position:absolute;bottom:-8px;left:50%;width:1px;height:8px;background:#bdbdbd}
+.conn-row{display:flex;align-items:stretch;min-height:48px;margin-bottom:4px;position:relative;padding:0 40px}
+.conn-left{flex:1;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px}
+.conn-arrow{width:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.conn-arrow-line{width:30px;height:2px;background:#4caf50;position:relative}
+.conn-arrow-line::after{content:'▶';position:absolute;right:-8px;top:-5px;font-size:10px;color:#4caf50}
+.conn-wait{font-size:10px;font-weight:bold;margin-top:1px}
+.conn-right{flex:1;display:flex;align-items:center;padding-left:8px;font-size:11px}
+.wait-ok{color:#2e7d32}.wait-warn{color:#e65100}.wait-bad{color:#c62828}
+
+/* Mini ship pill */
+.ship-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:11px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.pill-white{background:#e3f2fd;color:#1565c0;border:1px solid #bbdefb}
+.pill-orange{background:#fff3e0;color:#e65100;border:1px solid #ffe0b2}
+.pill-pink{background:#fce4ec;color:#c2185b;border:1px solid:f8bbd0}
+
+/* Summary section at bottom */
+.summary-section{margin-top:12px}
+.sum-card{background:#fff;border-radius:8px;padding:14px;margin-bottom:10px}
+.sum-title{font-weight:bold;font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.unas-list{list-style:none}
+.unas-item{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid #f0f0f0;font-size:12px}
+.unas-item:last-child{border-bottom:none}
+.unas-name{font-weight:600}
+.unas-teu{color:#c62828;font-weight:bold}
+
+/* Add modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:999;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:#fff;border-radius:12px;padding:24px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-title{font-size:16px;font-weight:bold;margin-bottom:16px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px}
+.form-group input,.form-group select{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* Card action buttons */
+.card-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2}
+.card-btn{width:22px;height:22px;border:none;border-radius:4px;cursor:pointer;font-size:12px;line-height:20px;text-align:center;transition:.15s}
+.card-btn-del{background:#ffebee;color:#c62828}
+.card-btn-del:hover{background:#ef5350;color:#fff}
+.card-btn-edit{background:#e3f2fd;color:#1565c0}
+.card-btn-edit:hover{background:#90caf9;color:#fff}
+.edit-teu{display:inline-block;min-width:50px;padding:1px 4px;border:1px dashed #90caf9;border-radius:3px;font-size:12px;font-weight:600;text-align:center;cursor:pointer;color:#1565c0;background:#fafafa;transition:.15s}
+.edit-teu:hover{border-style:solid;background:#e3f2fd}
+.edit-teu:focus{outline:none;border-color:#1565c0;background:#fff;box-shadow:0 0 0 2px rgba(21,101,192,.2)}
+.edit-date{display:inline-block;padding:1px 6px;border:1px dashed #90caf9;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer;background:#fafafa;transition:.15s}
+.edit-date:hover{border-style:solid;background:#e3f2fd}
+
+/* Responsive */
+@media(max-width:1100px){
+    .pipeline{grid-template-columns:280px 1fr 300px}
+}
+@media(max-width:900px){
+    .pipeline{grid-template-columns:1fr}
+    .col-body{max-height:none}
+}
+</style>
+</head>
+<body>
+
+<h1>🚢 布袋船排计划工具 v2</h1>
+<div class="sub">三段式物流管道：中国 → 巴生(PKG) → 红海 | 实时BSA舱位 · 自动衔接匹配</div>
+
+<!-- Upload -->
+<div class="upload-zone" id="uploadZone">
+<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+<input type="file" id="jsonInput" accept=".json" style="display:none">
+<div class="icon">📤</div>
+<p style="margin-bottom:8px;font-size:13px;color:#555"><b>方式一：</b>用Python脚本解析Excel → 生成JSON → 加载JSON（推荐，颜色识别准确）</p>
+<p style="margin-bottom:8px;font-size:13px;color:#555"><b>方式二：</b>直接上传Excel（颜色可能读不到，需手动标记）</p>
+<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+<button class="btn btn-blue" onclick="document.getElementById('jsonInput').click()">📂 加载 JSON</button>
+<button class="btn btn-blue" onclick="document.getElementById('fileInput').click()">📊 上传 Excel</button>
+<button class="btn btn-green" onclick="loadDemo()">🎮 演示数据</button>
+</div>
+<p id="fileName" style="margin-top:6px;font-size:12px;color:#1565c0"></p>
+<p id="parseHint" style="margin-top:4px;font-size:11px;color:#e65100;display:none">💡 提示：运行 <code>python parse_excel.py excel.xlsx sheet名</code> 可生成带颜色的JSON文件</p>
+</div>
+
+<!-- Classify Wizard Modal -->
+<div class="modal-overlay" id="classifyModal" onclick="if(event.target===this)this.style.display='none'">
+<div class="modal-box" style="max-width:600px;max-height:80vh;overflow-y:auto">
+<h3 style="margin-bottom:12px">🏷️ 手动标记船型</h3>
+<p style="font-size:12px;color:#666;margin-bottom:10px">系统未能自动识别以下船只的类型，请逐一选择：</p>
+<table style="width:100%;border-collapse:collapse;font-size:12px" id="classifyTable">
+<thead><tr style="background:#f5f5f5"><th style="padding:6px;text-align:left">#</th><th style="padding:6px;text-align:left">船名</th><th style="padding:6px;text-align:center">类型</th></tr></thead>
+<tbody id="classifyBody"></tbody>
+</table>
+<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+<button class="btn btn-sm" onclick="document.getElementById('classifyModal').style.display='none'" style="background:#eee">取消</button>
+<button class="btn btn-sm btn-green" onclick="applyClassification()">✅ 确认并排船</button>
+</div>
+</div>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar" id="statsBar" style="display:none"></div>
+
+<!-- Toolbar -->
+<div class="toolbar" id="toolbar" style="display:none">
+<button class="btn btn-orange" onclick="autoAssign()">🤖 自动排船</button>
+<button class="btn btn-blue" onclick="showClassifyWizard()">🏷️ 手动分类</button>
+<button class="btn btn-blue" onclick="showAddModal('feeder')">➕ 添加布袋船</button>
+<button class="btn btn-blue" onclick="showAddModal('white')">➕ 添加干线船</button>
+<button class="btn btn-green" onclick="exportPlan()">📥 导出计划</button>
+</div>
+
+<!-- ===== PIPELINE: THREE COLUMNS ===== -->
+<div class="pipeline" id="pipeline" style="display:none">
+
+<!-- LEFT: China → PKG -->
+<div class="col-left">
+<div class="col-header col-left-header">🇨🇳 干线船 · 中国到巴生</div>
+<div class="col-body" id="leftBody">
+<p style="color:#999;padding:20px;text-align:center">加载中...</p>
+</div>
+</div>
+
+<!-- MIDDLE: PKG Hub -->
+<div class="col-mid">
+<div class="col-header col-middle-header" style="background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff">🔄 巴生中转港 PKG · 衔接时间轴</div>
+<div class="col-body" id="midBody">
+<p style="color:#999;padding:20px;text-align:center">加载中...</p>
+</div>
+</div>
+
+<!-- RIGHT: PKG → Red Sea -->
+<div class="col-right">
+<div class="col-header col-right-header">🔴 布袋船 · 巴生到红海</div>
+<div class="col-body" id="rightBody">
+<p style="color:#999;padding:20px;text-align:center">加载中...</p>
+</div>
+</div>
+
+</div><!-- end pipeline -->
+
+<!-- Summary: Unassigned -->
+<div class="summary-section" id="summarySection" style="display:none"></div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+<div class="modal-box">
+<div class="modal-title" id="modalTitle">添加船只</div>
+<div id="modalForm"></div>
+<div class="form-actions">
+<button class="btn btn-green" onclick="submitAddShip()" style="font-size:12px">✅ 确认添加</button>
+<button class="btn" onclick="closeAddModal()" style="background:#eee;color:#555;font-size:12px">取消</button>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script>
+// ========== GLOBAL STATE ==========
+var appData = {
+    whites: [],
+    feeders: [],
+    pinks: [],
+    assignments: [],
+    fileName: ''
+};
+var nextMatchId = 1;
+
+// ========== UTILITIES ==========
+function parseDate(val) {
+    if (!val) return null;
+    var s = String(val).trim();
+    if (s.length === 10 && s.indexOf('-') > 0) return new Date(s + 'T00:00:00');
+    if (s.length >= 19) return new Date(s.substring(0,19).replace(/ /,'T'));
+    var n = Number(val);
+    if (!isNaN(n) && n > 25000 && n < 60000) { return new Date((n - 25569) * 86400000); }
+    return null;
+}
+
+function fmt(d) {
+    if (!(d instanceof Date)) return '—';
+    var m = d.getMonth()+1;
+    var dd = d.getDate();
+    return m+'/'+dd;
+}
+
+function fmtFull(d) {
+    if (!(d instanceof Date)) return '—';
+    var y = d.getFullYear();
+    var m = d.getMonth()+1;
+    var dd = d.getDate();
+    return y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+}
+
+function daysDiff(a, b) {
+    if (!a || !b) return 999;
+    return Math.round((b - a) / 86400000);
+}
+
+// Color palette for match badges
+var matchColors = ['#1565c0','#2e7d32','#e65100','#7b1fa2','#c62828','#00838f','#5d4037','#455a64'];
+function matchColor(id){return matchColors[(id-1)%matchColors.length];}
+
+// ========== LOAD DEMO DATA ==========
+function loadDemo() {
+    appData.whites = [
+        {row:51,name:'ZHI YING HE SHUN',pkg:new Date('2026-06-07'),teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:53,name:'FUYU',pkg:new Date('2026-06-14'),teu:800,svc:'SGX',fromPort:'中国各港'},
+        {row:54,name:'PEAFORCE',pkg:new Date('2026-06-16'),teu:520,svc:'REX',fromPort:'中国各港'},
+        {row:56,name:'HUA DONG 811',pkg:new Date('2026-06-18'),teu:1080,svc:'REX',fromPort:'中国各港'},
+        {row:59,name:'RACINE',pkg:new Date('2026-06-22'),teu:5500,svc:'AEM',fromPort:'中国各港'},
+        {row:63,name:'KAI DA HONG ZHOU',pkg:new Date('2026-06-18'),teu:950,svc:'SGX',fromPort:'中国各港'},
+        {row:65,name:'ZYHS',pkg:new Date('2026-06-29'),teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:67,name:'FUYU',pkg:new Date('2026-07-04'),teu:800,svc:'SGX',fromPort:'中国各港'},
+        {row:68,name:'HUA DONG 811',pkg:new Date('2026-07-08'),teu:1080,svc:'REX',fromPort:'中国各港'},
+        {row:69,name:'KAI DA HONG ZHOU',pkg:new Date('2026-07-08'),teu:950,svc:'SGX',fromPort:'中国各港'},
+        {row:71,name:'ZHI YING HE SHUN',pkg:new Date('2026-07-17'),teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:75,name:'HUA DONG 811',pkg:new Date('2026-07-30'),teu:1080,svc:'REX',fromPort:'中国各港'},
+        {row:76,name:'KAI DA HONG ZHOU',pkg:new Date('2026-07-25'),teu:950,svc:'SGX',fromPort:'中国各港'},
+        {row:77,name:'FUYU',pkg:new Date('2026-07-24'),teu:800,svc:'SGX',fromPort:'中国各港'}
+    ];
+    appData.feeders = [
+        {row:52,name:'MAO GANG SHANG HAI',pkg:new Date('2026-06-11'),teu:1150,svc:'SGX',toPort:'SOKHNA'},
+        {row:57,name:'TIGER LONGKOU',pkg:new Date('2026-06-17'),teu:1350,svc:'',toPort:'JEDDAH'},
+        {row:64,name:'CUL YANGPU',pkg:new Date('2026-06-21'),teu:1600,svc:'REX',toPort:'SOKHNA'},
+        {row:66,name:'HAIAN MIND',pkg:new Date('2026-07-03'),teu:1450,svc:'',toPort:'JEDDAH'},
+        {row:70,name:'HONG DA XIN 728',pkg:new Date('2026-07-13'),teu:1700,svc:'REX',toPort:'SOKHNA'},
+        {row:72,name:'MAO GANG SHANG HAI',pkg:new Date('2026-07-19'),teu:1150,svc:'SGX',toPort:'SOKHNA'},
+        {row:73,name:'TIGER LONGKOU',pkg:new Date('2026-07-25'),teu:1350,svc:'',toPort:'JEDDAH'},
+        {row:74,name:'CUL YANGPU',pkg:new Date('2026-07-25'),teu:1600,svc:'REX',toPort:'SOKHNA'},
+        {row:78,name:'TB JINJIANG',pkg:null,teu:1200,svc:'',toPort:'SOKHNA',note:'TBC'},
+        {row:79,name:'TENTATIVE ROTATION',pkg:null,teu:0,svc:'',toPort:'—',note:'TBC'}
+    ];
+    appData.pinks = [
+        {row:55,name:'WAN FU DA',pkg:null,teu:1600,svc:'REX'},
+        {row:58,name:'CUL HUMEN',pkg:null,teu:1050,svc:'REX'},
+        {row:60,name:'CHANG SHENG JI 8',pkg:null,teu:1650,svc:'REX'}
+    ];
+    appData.fileName = '演示数据 R51~R79';
+    appData.assignments = [];
+    nextMatchId = 1;
+    document.getElementById('fileName').textContent = '✅ 已加载演示数据';
+    autoAssign();
+}
+
+// ========== FILE UPLOAD ==========
+document.getElementById('fileInput').addEventListener('change', function(e) { handleFile(this); });
+document.getElementById('uploadZone').ondragover = function(e){e.preventDefault();this.style.borderColor='#1565c0';};
+document.getElementById('uploadZone').ondragleave = function(){this.style.borderColor='#bbb';};
+document.getElementById('uploadZone').ondrop = function(e){
+    e.preventDefault();this.style.borderColor='#bbb';
+    var f = e.dataTransfer.files[0];
+    if(f) readFile(f);
+};
+
+function handleFile(input){
+    var f = input.files[0];
+    if(f) readFile(f);
+}
+
+// JSON input handler
+document.getElementById('jsonInput').addEventListener('change',function(e){
+    var f = e.target.files[0];
+    if(!f)return;
+    var r = new FileReader();
+    r.onload = function(ev){
+        try{
+            var data = JSON.parse(ev.target.result);
+            loadJSONData(data, f.name);
+        }catch(err){
+            document.getElementById('fileName').textContent='❌ JSON解析失败: '+err.message;
+        }
+    };
+    r.readAsText(f);
+});
+
+// Load parsed JSON from Python script
+function loadJSONData(data, fname){
+    appData.whites = (data.whites||[]).map(function(s){
+        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',pkge:s.pkge?parseDate(s.pkge):null,
+                teu:s.teu||0,dischargeVol:s.dischargeVol||0,svc:s.svc||'',color:s.color||'00000000',
+                fromPort:s.pol||s.fromPort||'中国各港',toPort:s.pod||s.toPort||'',_type:s.type||'W'};
+    });
+    appData.feeders = (data.feeders||[]).map(function(s){
+        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',pkge:s.pkge?parseDate(s.pkge):null,
+                teu:s.teu||0,svc:s.svc||'',color:s.color||'FBE2D5',
+                toPort:s.pod||s.toPort||'红海',fromPort:'巴生PKG',_type:'F'};
+    });
+    appData.pinks = (data.pinks||[]).map(function(s){
+        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',teu:s.teu||0,
+                svc:s.svc||'',color:s.color||'',fromPort:s.fromPort||'中国各港',toPort:s.toPort||'红海',_type:'P'};
+    });
+
+    var summary = data.summary||{};
+    document.getElementById('fileName').textContent='✅ 已加载: '+(fname||'JSON')+
+        ' | 干线'+appData.whites+' 布袋'+appData.feeders.length+' 直航'+appData.pinks.length;
+
+    // Show hint about parse_excel.py only for Excel uploads
+    document.getElementById('parseHint').style.display='none';
+
+    nextMatchId=1;autoAssign();
+}
+
+// ===== CLASSIFY WIZARD =====
+var _classifyItems=[]; // ships that need manual classification
+
+function showClassifyWizard(){
+    // Collect all whites with unknown/other colors
+    _classifyItems=[];
+    var body=document.getElementById('classifyBody');
+    body.innerHTML='';
+    var idx=0;
+    for(var i=0;i<appData.whites.length;i++){
+        var w=appData.whites[i];
+        // Only show items that are not clearly white
+        if(w.color && w.color!=='00000000' && w.color!=='FFFFFFFF'){
+            idx++;
+            _classifyItems.push({idx:i,color:w.color,name:w.name,current:'W'});
+            var tr=document.createElement('tr');
+            tr.style.borderBottom='1px solid #eee';
+            tr.innerHTML='<td style="padding:6px">'+idx+'</td>'+
+                '<td style="padding:6px;font-weight:600">'+w.name+'</td>'+
+                '<td style="padding:6px;text-align:center">'+
+                '<select id="cls_'+i+'" onchange="_classifyItems['+(_classifyItems.length-1)+'].current=this.value" style="padding:3px 8px;border-radius:4px;border:1px solid #ccc;font-size:12px">'+
+                '<option value="W" '+(w._type==='W'?'selected':'')+'>🔵 干线船(中国→巴生)</option>'+
+                '<option value="F" '+(w._type==='F'?'selected':'')+'>🟠 布袋船(巴生→红海)</option>'+
+                '<option value="P" '+(w._type==='P'?'selected':'')+'>🩷 直航(中国→红海)</option>'+
+                '</select></td>';
+            body.appendChild(tr);
+        }
+    }
+    // Also show feeders in case user wants to change them
+    for(var j=0;j<appData.feeders.length;j++){
+        var f=appData.feeders[j];idx++;
+        _classifyItems.push({idx:j,isFeeder:true,color:f.color,name:f.name,current:'F'});
+        var tr2=document.createElement('tr');
+        tr2.style.borderBottom='1px solid #eee';tr2.style.background='#fff3e0';
+        tr2.innerHTML='<td style="padding:6px">'+idx+'</td><td style="padding:6px;font-weight:600;color:#e65100">'+f.name+'</td>'+
+            '<td style="padding:6px;text-align:center"><select id="cls_f'+j+'" onchange="_classifyItems['+(_classifyItems.length-1)+'].current=this.value" style="padding:3px 8px;border-radius:4px;border:1px solid #ccc;font-size:12px">'+
+            '<option value="F" selected>🟠 布袋船(巴生→红海)</option>'+
+            '<option value="W">🔵 改为干线船</option>'+
+            '<option value="P">🩷 改为直航</option>'+
+            '</select></td>';
+        body.appendChild(tr2);
+    }
+    if(idx===0){alert('所有船只类型已明确，无需手动分类。');return;}
+    document.getElementById('classifyModal').style.display='flex';
+}
+
+function applyClassification(){
+    // Move ships between arrays based on user selection
+    var newWhites=[],newFeeders=[],newPinks=[];
+    var processed={};
+
+    for(var k=0;k<_classifyItems.length;k++){
+        var item=_classifyItems[k];
+        var srcArr=item.isFeeder?appData.feeders:appData.whites;
+        var ship=srcArr[item.idx];
+
+        if(processed[item.idx+'_'+(item.isFeeder?'f':'w')])continue;
+        processed[item.idx+'_'+(item.isFeeder?'f':'w')]=true;
+
+        if(item.current==='W'){ship._type='W';newWhites.push(ship);}
+        else if(item.current==='F'){ship._type='F';ship.fromPort='巴生PKG';if(!ship.toPort)ship.toPort='红海';newFeeders.push(ship);}
+        else if(item.current==='P'){ship._type='P';newPinks.push(ship);}
+    }
+
+    // Add remaining unclassified items
+    for(var i=0;i<appData.whites.length;i++){
+        if(!processed[i+'_w'])newWhites.push(appData.whites[i]);
+    }
+    for(var j=0;j<appData.feeders.length;j++){
+        if(!processed[j+'_f'])newFeeders.push(appData.feeders[j]);
+    }
+
+    appData.whites=newWhites;appData.feeders=newFeeders;appData.pinks=newPinks;
+    document.getElementById('classifyModal').style.display='none';
+
+    nextMatchId=1;autoAssign();
+}
+
+function readFile(file){
+    document.getElementById('fileName').textContent='读取中: '+file.name;
+    document.getElementById('parseHint').style.display='';
+    var r = new FileReader();
+    r.onload = function(e){
+        try{
+            var wb = XLSX.read(e.target.result,{type:'array',cellDates:true,dateNF:'yyyy-mm-dd'});
+            parseWorkbook(wb);
+            appData.fileName=file.name;
+
+            // Check if colors were detected
+            var hasColor=false;
+            for(var i=0;i<appData.whites.length;i++){if(appData.whites[i].color && appData.whites[i].color!=='00000000'){hasColor=true;break;}}
+            for(var j=0;j<appData.feeders.length;j++){if(appData.feeders[j].length>0){hasColor=true;break;}}
+
+            var msg='⚠️ '+file.name+' (SheetJS直接解析，颜色可能不准)';
+            if(appData.feeders.length===0)msg+=' | 未检测到布袋船，请点击「🏷️ 手动分类」标记';
+            document.getElementById('fileName').textContent=msg;
+
+            nextMatchId=1;
+            autoAssign();
+
+            // Auto-show classify wizard if no feeders detected
+            if(appData.feeders.length===0 && appData.whites.length>0){
+                setTimeout(function(){showClassifyWizard();},500);
+            }
+        }catch(err){
+            document.getElementById('fileName').textContent='❌ 解析失败: '+err.message;
+            console.error(err);
+        }
+    };
+    r.readAsArrayBuffer(file);
+}
+
+function parseWorkbook(wb){
+    var sheetName = wb.SheetNames[0];
+    var ws = wb.Sheets[sheetName];
+    var data = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    var hdrRow = -1;
+    for(var i=0;i<data.length;i++){
+        var rowStr = JSON.stringify(data[i]).toUpperCase();
+        if(rowStr.indexOf('CUL VESSELS')>=0){hdrRow=i;break;}
+    }
+    if(hdrRow<0){alert('找不到表头(CUL VESSELS列)');return;}
+    var headers = [];
+    for(var c=0;c<data[hdrRow].length;c++){
+        headers.push(String(data[hdrRow][c]||'').trim().toUpperCase());
+    }
+    function colIdx(name){return headers.indexOf(name.toUpperCase());};
+    var pkgCol = colIdx('PKG');
+    var teuCol = colIdx('EFF. TEUS');
+    var vesCol = colIdx('CUL VESSELS');
+    var svcCol = colIdx('SERVICES');
+
+    appData.whites=[];appData.feeders=[];appData.pinks=[];
+    for(var r=hdrRow+1;r<data.length;r++){
+        var row = data[r];if(!row)continue;
+        var v = String(row[vesCol]||'').trim();
+        if(!v)continue;
+        var pkgDt = parseDate(row[pkgCol]);
+        var teuNum = isNaN(Number(row[teuCol]))?0:Number(row[teuCol]);
+        var svc = String(row[svcCol]||'');
+        var color = getCellColor(ws, hdrRow+1+r, vesCol+1);
+        var ct = classifyColor(color);
+        var entry={row:r+1,name:v,pkg:pkgDt,teu:teuNum,svc:svc,color:color,fromPort:'中国各港',toPort:'红海'};
+        if(ct==='W')appData.whites.push(entry);
+        else if(ct==='F')appData.feeders.push(entry);
+        else if(ct==='P')appData.pinks.push(entry);
+    }
+}
+
+function getCellColor(ws, r, c){
+    try{
+        var addr = XLSX.utils.encode_cell({r:r-1,c:c-1});
+        var cell = ws[addr];
+        if(!cell||!cell.s)return '00000000';
+        if(cell.s.fgColor&&cell.s.fgColor.rgb)return String(cell.s.fgColor.rgb).toUpperCase();
+        return '00000000';
+    }catch(e){return '00000000';}
+}
+
+function classifyColor(rgb){
+    if(!rgb||rgb==='00000000'||rgb==='FFFFFFFF')return 'W';
+    if(rgb.indexOf('DAF2D0')>=0)return 'P';
+    if(rgb.indexOf('FBE2D5')>=0)return 'F';
+    return '?';
+}
+
+// ========== AUTO ASSIGN ==========
+function autoAssign(){
+    appData.assignments=[];
+    // Sort whites by ETA
+    appData.whites.sort(function(a,b){ if(!a.pkg)return 1;if(!b.pkg)return -1;return a.pkg-b.pkg; });
+
+    for(var wi=0;wi<appData.whites.length;wi++){
+        var w=appData.whites[wi];
+        if(!w.pkg)continue;
+        var cargo=w.teu;
+        if(cargo<=0)continue;
+        var remain=cargo;
+        
+        // Find all eligible feeders (ETD >= ETA + 1 day)
+        var opts=[];
+        for(var fi=0;fi<appData.feeders.length;fi++){
+            var f=appData.feeders[fi];
+            if(!f.pkg)continue;
+            var dd=daysDiff(w.pkg,f.pkg);
+            if(dd>=1)opts.push({fi:fi,days:dd,bsa:f.teu});
+        }
+        opts.sort(function(a,b){return a.days-b.days});
+
+        for(var oi=0;oi<opts.length&&remain>0;oi++){
+            var f=appData.feeders[opts[oi].fi];
+            var used=usedOnFeeder(f.row);
+            var avail=f.teu-used;
+            if(avail<=0)continue;
+            var take=Math.min(remain,avail);
+            appData.assignments.push({
+                wi:wi,
+                fi:opts[oi].fi,
+                days:opts[oi].days,
+                ateu:take,
+                wRow:w.row,
+                fRow:f.row,
+                mid:nextMatchId++
+            });
+            remain-=take;
+        }
+    }
+    renderAll();
+}
+
+// ========== DELETE / EDIT FUNCTIONS ==========
+function deleteWhite(idx){
+    if(!confirm('确认删除干线船「'+appData.whites[idx].name+'」？相关衔接也会清除。'))return;
+    var wRow = appData.whites[idx].row;
+    appData.whites.splice(idx,1);
+    // Remove related assignments
+    for(var a=appData.assignments.length-1;a>=0;a--){
+        if(appData.assignments[a].wRow===wRow)appData.assignments.splice(a,1);
+    }
+    renderAll();
+}
+
+function deleteFeeder(idx){
+    if(!confirm('确认删除布袋船「'+appData.feeders[idx].name+'」？相关衔接也会清除。'))return;
+    var fRow = appData.feeders[idx].row;
+    appData.feeders.splice(idx,1);
+    // Remove related assignments
+    for(var a=appData.assignments.length-1;a>=0;a--){
+        if(appData.assignments[a].fRow===fRow)appData.assignments.splice(a,1);
+    }
+    renderAll();
+}
+
+function startEditTeu(el, type, idx){
+    if(el.tagName==='INPUT')return; // already editing
+    var oldVal = el.getAttribute('data-val');
+    var inp = document.createElement('input');
+    inp.type='number';
+    inp.value=oldVal;
+    inp.style.cssText='width:70px;padding:2px 4px;border:1px solid #1565c0;border-radius:3px;font-size:12px;font-weight:600;text-align:center';
+    inp.addEventListener('blur', function(){
+        saveEditTeu(type, idx, this.value);
+    });
+    inp.addEventListener('keydown', function(e){
+        if(e.key==='Enter')this.blur();
+        if(e.key==='Escape'){renderAll();return;}
+    });
+    el.innerHTML='';
+    el.appendChild(inp);
+    inp.focus();
+    inp.select();
+}
+
+function saveEditTeu(type, idx, val){
+    var num = parseInt(val)||0;
+    if(type==='white'){
+        if(idx>=0 && idx<appData.whites.length)appData.whites[idx].teu=num;
+    } else {
+        if(idx>=0 && idx<appData.feeders.length)appData.feeders[idx].teu=num;
+    }
+    renderAll();
+}
+
+// ========== 日期编辑 ==========
+function fmtDateInput(d){
+    if(!d)return '';
+    var y=d.getFullYear(),m=d.getMonth()+1,dd=d.getDate();
+    return y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+}
+
+function startEditDate(el, type, idx){
+    if(el.tagName==='INPUT')return;
+    var oldVal = el.getAttribute('data-val') || '';
+    var inp = document.createElement('input');
+    inp.type='date';
+    inp.value=oldVal;
+    inp.style.cssText='padding:2px 4px;border:1px solid #1565c0;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer';
+    inp.addEventListener('change', function(){
+        saveEditDate(type, idx, this.value);
+    });
+    inp.addEventListener('keydown', function(e){
+        if(e.key==='Escape'){renderAll();return;}
+    });
+    el.innerHTML='';
+    el.appendChild(inp);
+    inp.focus();
+    if(oldVal)inp.select();
+}
+
+function saveEditDate(type, idx, val){
+    var d = val ? parseDate(val) : null;
+    if(type==='white'){
+        if(idx>=0 && idx<appData.whites.length)appData.whites[idx].pkg=d;
+    } else {
+        if(idx>=0 && idx<appData.feeders.length)appData.feeders[idx].pkg=d;
+    }
+    renderAll(); // 会重新触发autoAssign
+}
+
+// ========== HELPERS ==========
+function usedOnFeeder(fRow){
+    var t=0;
+    for(var i=0;i<appData.assignments.length;i++){
+        if(appData.assignments[i].fRow===fRow)t+=appData.assignments[i].ateu;
+    }
+    return t;
+}
+
+function unassignedForWhite(wRow){
+    var w=null;
+    for(var i=0;i<appData.whites.length;i++){if(appData.whites[i].row===wRow){w=appData.whites[i];break;}}
+    if(!w)return 0;
+    var done=0;
+    for(var j=0;j<appData.assignments.length;j++){if(appData.assignments[j].wRow===wRow)done+=appData.assignments[j].ateu;}
+    return Math.max(0,w.teu-done);
+}
+
+function assignmentsForFeeder(fRow){
+    var list=[];
+    for(var i=0;i<appData.assignments.length;i++){
+        if(appData.assignments[i].fRow===fRow)list.push(appData.assignments[i]);
+    }
+    return list;
+}
+
+function assignmentsForWhite(wRow){
+    var list=[];
+    for(var i=0;i<appData.assignments.length;i++){
+        if(appData.assignments[i].wRow===wRow)list.push(appData.assignments[i]);
+    }
+    return list;
+}
+
+// ========== RENDER ALL ==========
+function renderAll(){
+    renderStats();
+    renderLeftColumn();
+    renderMidColumn();
+    renderRightColumn();
+    renderSummary();
+
+    document.getElementById('statsBar').style.display='';
+    document.getElementById('toolbar').style.display='';
+    document.getElementById('pipeline').style.display='';
+    document.getElementById('summarySection').style.display='';
+}
+
+// --- Stats ---
+function renderStats(){
+    var totalCargo=0;
+    for(var i=0;i<appData.whites.length;i++)totalCargo+=appData.whites[i].teu;
+    var totalDone=0;
+    for(var j=0;j<appData.assignments.length;j++)totalDone+=appData.assignments[j].ateu;
+    var unas=totalCargo-totalDone;
+    var pct=totalCargo>0?Math.round(totalDone/totalCargo*100):0;
+
+    var h='';
+    h+='<div class="stat-item"><div class="stat-num">'+appData.whites.length+'</div><div class="stat-l">干线船</div></div>';
+    h+='<div class="stat-item"><div class="stat-num stat-org">'+appData.feeders.length+'</div><div class="stat-l">布袋船</div></div>';
+    h+='<div class="stat-item"><div class="stat-num stat-green">'+totalDone+'</div><div class="stat-l">已接 TEU</div></div>';
+    h+='<div class="stat-item stat-red"><div class="stat-num">'+unas+'</div><div class="stat-l">未接 TEU</div></div>';
+    h+='<div class="stat-item"><div class="stat-num" style="color:#455a64">'+pct+'%</div><div class="stat-l">衔接率</div></div>';
+    document.getElementById('statsBar').innerHTML=h;
+}
+
+// --- LEFT COLUMN: Mainline Ships ---
+function renderLeftColumn(){
+    var html='';
+
+    if(appData.whites.length===0){
+        html='<p style="color:#999;padding:20px;text-align:center">暂无干线船数据</p>';
+        document.getElementById('leftBody').innerHTML=html;
+        return;
+    }
+
+    for(var i=0;i<appData.whites.length;i++){
+        var w = appData.whites[i];
+        var assigns = assignmentsForWhite(w.row);
+        var doneTeu = 0;
+        for(var a=0;a<assigns.length;a++)doneTeu+=assigns[a].ateu;
+        var unTeu = Math.max(0,w.teu-doneTeu);
+
+        // Card status
+        var cls = '';
+        if(doneTeu>=w.teu)cls='assigned';
+        else if(doneTeu>0)cls='partial';
+        else cls='unassigned';
+
+        // Status text
+        var st = '', stClr = '';
+        if(unTeu<=0){st='✅ 全部已接';stClr='#2e7d32';}
+        else if(doneTeu>0){st='⚠️ 部分 '+unTeu+'TEU未接';stClr='#e65100';}
+        else{st='❌ 未安排';stClr='#c62828';}
+
+        html+='<div class="ship-card '+cls+'">';
+        html+='<div class="card-actions">';
+        html+='<button class="card-btn card-btn-edit" title="编辑" onclick="editWhiteTeu('+i+')">✎</button>';
+        html+='<button class="card-btn card-btn-del" title="删除" onclick="deleteWhite('+i+')">×</button>';
+        html+='</div>';
+        html+='<div class="card-name">';
+        html+='<span class="match-tag" style="background:'+matchColor(i+1)+'">'+(i+1)+'</span>';
+        html+='<span>'+w.name+'</span>';
+        html+='</div>';
+        html+='<div class="card-svc">'+(w.svc||'—')+'</div>';
+
+        html+='<div class="card-row"><span class="card-label">起运港</span><span class="card-val">'+(w.fromPort||'中国各港')+'</span></div>';
+        var etaVal = w.pkg ? fmtFull(w.pkg) : '<span style="color:#999">点击设置</span>';
+        var etaData = w.pkg ? fmtDateInput(w.pkg) : '';
+        html+='<div class="card-row"><span class="card-label">ETA 巴生</span>';
+        html+='<span class="card-val edit-date" style="color:#1565c0;cursor:pointer" data-val="'+etaData+'" ';
+        html+='onclick="startEditDate(this,'+"'white'"+','+i+')">'+etaVal+'</span></div>';
+        html+='<div class="card-row"><span class="card-label">货量</span><span class="card-val"><span class="edit-teu" onclick="startEditTeu(this,\'white\','+i+')" data-val="'+w.teu+'">'+w.teu+' TEU</span></span></div>';
+        html+='<div class="card-row"><span class="card-label">已接</span><span class="card-val" style="color:#2e7d32">'+doneTeu+' TEU</span></div>';
+        html+='<div class="card-row"><span class="card-label">状态</span><span class="card-val" style="color:'+stClr+'">'+st+'</span></div>';
+
+        if(assigns.length>0){
+            html+='<div style="margin-top:6px;font-size:10px;color:#888;border-top:1px solid #f0f0f0;padding-top:4px">';
+            html+='<div>→ 接至:</div>';
+            for(var m=0;m<assigns.length;m++){
+                var aa=assigns[m];
+                var fn=appData.feeders[aa.fi]?appData.feeders[aa.fi].name:'?';
+                html+='<div style="padding:1px 0">· <b>'+fn+'</b> 接 '+aa.ateu+'TEU (等'+aa.days+'天)</div>';
+            }
+            html+='</div>';
+        }
+
+        html+='</div>'; // end card
+    }
+
+    document.getElementById('leftBody').innerHTML=html;
+}
+
+// --- MIDDLE COLUMN: Connection Timeline ---
+function renderMidColumn(){
+    var wrap = document.getElementById('midBody');
+
+    if(appData.assignments.length===0){
+        wrap.innerHTML='<p style="color:#999;padding:40px 20px;text-align:center">暂无衔接 — 请点击「自动排船」</p>';
+        return;
+    }
+
+    // Build sorted plan by white ship ETA
+    var plan = appData.assignments.slice().sort(function(a,b){
+        var wa=appData.whites[a.wi],wb=appData.whites[b.wi];
+        if(!wa.pkg)return 1;if(!wb.pkg)return -1;return wa.pkg-wb.pkg;
+    });
+
+    // Date range
+    var allDates=[];
+    for(var i=0;i<plan.length;i++){
+        var w=appData.whites[plan[i].wi];var f=appData.feeders[plan[i].fi];
+        if(w.pkg)allDates.push(w.pkg);if(f.pkg)allDates.push(f.pkg);
+    }
+    allDates.sort(function(a,b){return a-b;});
+    var minD=allDates[0],maxD=allDates[allDates.length-1];
+
+    // Generate time ticks (every ~7 days)
+    var ticks=[];
+    var cur=new Date(minD);
+    while(cur<=maxD){
+        ticks.push(new Date(cur));
+        cur.setDate(cur.getDate()+7);
+    }
+    if(ticks.length<2)ticks.push(new Date(maxD));
+
+    var html='<div class="timeline-area">';
+
+    // Time axis header
+    html+='<div class="time-axis">';
+    for(var t=0;t<ticks.length;t++){
+        html+='<div class="time-tick">'+fmt(ticks[t])+'</div>';
+    }
+    html+='</div>';
+
+    // Each connection row
+    for(var k=0;k<plan.length;k++){
+        var a=plan[k];
+        var w=appData.whites[a.wi];var f=appData.feeders[a.fi];
+
+        // Wait time class
+        var wc='wait-ok';if(a.days>5)wc='wait-warn';if(a.days>10)wc='wait-bad';
+
+        html+='<div class="conn-row">';
+        // Left side: white ship info
+        html+='<div class="conn-left">';
+        html+='<span class="ship-pill pill-white" title="'+w.name+'">';
+        html+='<span class="match-tag" style="background:'+matchColor(a.mid)+';width:16px;height:16px;line-height:16px;font-size:9px">'+a.mid+'</span>';
+        html+=w.name.length>12?w.name.substring(0,11)+'..':w.name;
+        html+='</span>';
+        html+='<div style="font-size:10px;color:#1565c0;margin-top:2px">'+fmt(w.pkg)+'</div>';
+        html+='</div>';
+
+        // Arrow / connection
+        html+='<div class="conn-arrow">';
+        html+='<div class="conn-arrow-line" style="background:'+matchColor(a.mid)+'"></div>';
+        html+='<div class="conn-wait '+wc+'">'+a.days+'天</div>';
+        html+='<div style="font-size:10px;color:#2e7d32;font-weight:bold">'+a.ateu+'TEU</div>';
+        html+='</div>';
+
+        // Right side: feeder info
+        html+='<div class="conn-right">';
+        html+='<span class="ship-pill pill-orange" title="'+f.name+'">';
+        html+='<span class="match-tag" style="background:'+matchColor(a.mid)+';width:16px;height:16px;line-height:16px;font-size:9px">'+a.mid+'</span>';
+        html+=f.name.length>12?f.name.substring(0,11)+'..':f.name;
+        html+='</span>';
+        html+='<div style="font-size:10px;color:#e65100;margin-top:2px">'+fmt(f.pkg)+' → '+(f.toPort||'红海')+'</div>';
+        html+='</div>';
+
+        html+='</div>'; // end conn-row
+    }
+
+    // Show unassigned at bottom
+    var shown={};
+    for(var u=0;u<plan.length;u++)shown[plan[u].wRow]=true;
+    var hasUnas=false;
+    for(var v=0;v<appData.whites.length;v++){
+        var uw=appData.whites[v];
+        var un=unassignedForWhite(uw.row);
+        if(un>0){
+            if(!hasUnas){hasUnas=true;html+='<hr style="margin:10px 0;border:0;border-top:1px dashed #ccc">';}
+            html+='<div style="padding:6px 12px;background:#fff8e1;border-radius:6px;margin-bottom:4px;font-size:12px">';
+            html+='<span style="color:#c62828;font-weight:bold">⚠ '+uw.name+'</span> ';
+            html+='<span>有 <b style="color:#c62828">'+un+' TEU</b> 未衔接 (到巴生 '+fmt(uw.pkg)+')</span>';
+            html+='</div>';
+        }
+    }
+
+    html+='</div>'; // end timeline-area
+    wrap.innerHTML=html;
+}
+
+// --- RIGHT COLUMN: Feeder Ships (BSA) ---
+function renderRightColumn(){
+    var html='';
+
+    if(appData.feeders.length===0){
+        html='<p style="color:#999;padding:20px;text-align:center">暂无布袋船数据</p>';
+        document.getElementById('rightBody').innerHTML=html;
+        return;
+    }
+
+    for(var i=0;i<appData.feeders.length;i++){
+        var f = appData.feeders[i];
+        var used = usedOnFeeder(f.row);
+        var left = f.teu - used;
+        var pct = f.teu > 0 ? Math.round(used/f.teu*100) : 0;
+
+        var barClr = '#ccc';
+        if(pct >= 80)barClr = '#4caf50';
+        else if(pct >= 30)barClr = '#ff9800';
+        else if(pct > 0)barClr = '#ffc107';
+
+        // Find which whites connect to this feeder
+        var conns = assignmentsForFeeder(f.row);
+        var srcNames=[];
+        for(var c=0;c<conns.length;c++){
+            var cw=appData.whites[conns[c].wi];
+            if(cw)srcNames.push(cw.name);
+        }
+
+        html+='<div class="ship-card'+(used>0?' assigned':'')+'">';
+        html+='<div class="card-actions">';
+        html+='<button class="card-btn card-btn-edit" title="编辑" onclick="editFeederTeu('+i+')">✎</button>';
+        html+='<button class="card-btn card-btn-del" title="删除" onclick="deleteFeeder('+i+')">×</button>';
+        html+='</div>';
+        html+='<div class="card-name">';
+        html+='<span>'+(f.note?f.note+' ':'')+f.name+'</span>';
+        html+='</div>';
+        html+='<div class="card-svc">'+(f.svc||'—')+' → '+(f.toPort||'红海')+'</div>';
+
+        var etdVal = f.pkg ? fmtFull(f.pkg) : '<span style="color:#999">点击设置</span>';
+        var etdData = f.pkg ? fmtDateInput(f.pkg) : '';
+        html+='<div class="card-row"><span class="card-label">ETD 巴生</span>';
+        html+='<span class="card-val edit-date" style="color:#e65100;cursor:pointer" data-val="'+etdData+'" ';
+        html+='onclick="startEditDate(this,'+"'feeder'"+','+i+')">'+etdVal+'</span></div>';
+        html+='<div class="card-row"><span class="card-label">BSA 总舱位</span><span class="card-val"><span class="edit-teu" onclick="startEditTeu(this,\'feeder\','+i+')" data-val="'+f.teu+'">'+f.teu+' TEU</span></span></div>';
+        html+='<div class="card-row"><span class="card-label">已装载</span><span class="card-val" style="color:#2e7d32">'+used+' TEU</span></div>';
+        html+='<div class="card-row"><span class="card-label">剩余舱位</span><span class="card-val" style="color:'+(left>0?'#e65100':'#2e7d32')+'">'+left+' TEU</span></div>';
+
+        // BSA Progress bar
+        html+='<div style="margin-top:6px">';
+        html+='<div style="font-size:11px;color:#666;margin-bottom:2px">利用率 '+pct+'%</div>';
+        html+='<div class="bsa-bar-wrap">';
+        html+='<div class="bsa-bar-fill" style="width:'+Math.max(pct,1)+'%;background:'+barClr+'"></div>';
+        if(pct>0)html+='<span class="bsa-text">'+pct+'%</span>';
+        html+='</div>';
+        html+='</div>';
+
+        // Source connections
+        if(srcNames.length>0){
+            html+='<div style="margin-top:6px;font-size:10px;color:#888;border-top:1px solid #f0f0f0;padding-top:4px">';
+            html+='<div>↑ 来自:</div>';
+            for(var sn=0;sn<srcNames.length;sn++){
+                html+='<div style="padding:1px 0">· '+srcNames[sn]+'</div>';
+            }
+            html+='</div>';
+        }
+
+        html+='</div>'; // end card
+    }
+
+    document.getElementById('rightBody').innerHTML=html;
+}
+
+// --- SUMMARY SECTION ---
+function renderSummary(){
+    var totalC=0,totalD=0;
+    for(var i=0;i<appData.whites.length;i++)totalC+=appData.whites[i].teu;
+    for(var j=0;j<appData.assignments.length;j++)totalD+=appData.assignments[j].ateu;
+    var unas=totalC-totalD;
+
+    var html='<div class="sum-card">';
+    html+='<div class="sum-title">📊 衔接总览</div>';
+
+    // Overview row
+    html+='<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">';
+    html+='<div style="text-align:center;padding:8px 16px;background:#e8f5e9;border-radius:8px;min-width:80px"><div style="font-size:20px;font-weight:bold;color:#2e7d32">'+totalD+'</div><div style="font-size:11px;color:#666">已接TEU</div></div>';
+    html+='<div style="text-align:center;padding:8px 16px;background:#ffebee;border-radius:8px;min-width:80px"><div style="font-size:20px;font-weight:bold;color:#c62828">'+unas+'</div><div style="font-size:11px;color:#666">未接TEU</div></div>';
+    html+='<div style="text-align:center;padding:8px 16px;background:#e3f2fd;border-radius:8px;min-width:80px"><div style="font-size:20px;font-weight:bold;color:#1565c0">'+appData.assignments.length+'</div><div style="font-size:11px;color:#666">衔接条数</div></div>';
+    html+='<div style="text-align:center;padding:8px 16px;background:#fff3e0;border-radius:8px;min-width:80px"><div style="font-size:20px;font-weight:bold;color:#e65100">'+appData.feeders.length+'</div><div style="font-size:11px;color:#666">可用布袋船</div></div>';
+    html+='</div>';
+
+    if(unas>0){
+        html+='<div style="font-weight:bold;font-size:13px;margin-bottom:6px;color:#c62828">⚠️ 未安排货物明细:</div>';
+        html+='<div class="unas-list">';
+        var ulist=[];
+        for(var k=0;k<appData.whites.length;k++){
+            var uv=unassignedForWhite(appData.whites[k].row);
+            if(uv>0)ulist.push({ship:appData.whites[k],need:uv});
+        }
+        ulist.sort(function(a,b){if(!a.ship.pkg)return 1;if(!b.ship.pkg)return -1;return a.ship.pkg-b.ship.pkg;});
+        for(var m=0;m<ulist.length;m++){
+            var it=ulist[m];
+            html+='<div class="unas-item">';
+            html+='<span class="unas-name">'+it.ship.name+'</span>';
+            html+='<span style="color:#888;font-size:11px">'+fmt(it.ship.pkg)+' 到巴生</span>';
+            html+='<span class="unas-teu">'+it.need+' TEU</span>';
+            html+='</div>';
+        }
+        html+='</div>';
+
+        // Suggestions
+        html+='<div style="margin-top:12px;padding:10px 14px;background:#fff8e0;border-radius:6px;font-size:12px;line-height:1.8">';
+        html+='<b>💡 加船建议:</b><br>';
+        for(var s=0;s<ulist.length;s++){
+            var sit=ulist[s];
+            var suggest=Math.min(sit.need,1700);
+            html+=(s+1)+'. 在 <b>'+fmt(sit.ship.pkg)+' 后</b> 加一条 ≥'+suggest+'TEU 的布袋船（当前缺 '+sit.need+'TEU）<br>';
+        }
+        html+='</div>';
+    }else{
+        html+='<div style="padding:16px;background:#e8f5e9;border-radius:8px;text-align:center;color:#2e7d32;font-weight:bold">🎉 所有货物已全部安排衔接！无需加船。</div>';
+    }
+
+    html+='</div>'; // end sum-card
+
+    // Pink ships note (direct)
+    if(appData.pinks.length>0){
+        html+='<div class="sum-card" style="margin-top:10px">';
+        html+='<div class="sum-title" style="color:#c2185b">🩷 直航船舶（不参与巴生中转）</div>';
+        html+='<div style="font-size:12px">';
+        for(var p=0;p<appData.pinks.length;p++){
+            html+='· <b>'+appData.pinks[p].name+'</b> ('+(appData.pinks[p].svc||'?')+', '+appData.pinks[p].teu+'TEU)';
+            if(p<appData.pinks.length-1)html+='<br>';
+        }
+        html+='</div></div>';
+    }
+
+    document.getElementById('summarySection').innerHTML=html;
+}
+
+// ========== ADD SHIP MODAL ==========
+var addType = '';
+
+function showAddModal(type){
+    addType = type;
+    document.getElementById('modalTitle').textContent = type==='feeder'?'➕ 添加布袋船':'➕ 添加干线船';
+    var isF = type==='feeder';
+    
+    var fhtml='';
+    fhtml+='<div class="form-group"><label>船名 *</label><input id="addName" placeholder="例: NEW FEEDER"></div>';
+    fhtml+='<div class="form-group"><label>航线/SVC</label><input id="addSvc" placeholder="例: REX / SGX"></div>';
+    if(isF){
+        fhtml+='<div class="form-group"><label>离巴生日期 (ETD)</label><input id="addDate" type="date" placeholder="YYYY-MM-DD"></div>';
+        fhtml+='<div class="form-group"><label>目的港</label><input id="addToPort" placeholder="例: SOKHNA / JEDDAH"></div>';
+    }else{
+        fhtml+='<div class="form-group"><label>到巴生日期 (ETA)</label><input id="addDate" type="date" placeholder="YYYY-MM-DD"></div>';
+        fhtml+='<div class="form-group"><label>起运港</label><input id="addFromPort" placeholder="例: 中国各港"></div>';
+    }
+    fhtml+='<div class="form-group"><label>BSA/货量 TEU *</label><input id="addTeu" type="number" placeholder="例: 1200" min="0"></div>';
+    
+    document.getElementById('modalForm').innerHTML=fhtml;
+    document.getElementById('addModal').classList.add('show');
+}
+
+function closeAddModal(){
+    document.getElementById('addModal').classList.remove('show');
+}
+
+function submitAddShip(){
+    var name = document.getElementById('addName').value.trim();
+    var teuStr = document.getElementById('addTeu').value;
+    var teu = isNaN(Number(teuStr))?0:Number(teuStr);
+    var svc = document.getElementById('addSvc').value.trim();
+    var dateVal = document.getElementById('addDate').value;
+    var dt = dateVal ? new Date(dateVal+'T00:00:00') : null;
+
+    if(!name || teu<=0){
+        alert('请填写船名和TEU数量');return;
+    }
+
+    var maxRow = 0;
+    var allShips = addType==='feeder'?appData.feeders:appData.whites;
+    for(var x=0;x<allShips.length;x++){if(allShips[x].row>maxRow)maxRow=allShips[x].row;}
+
+    if(addType==='feeder'){
+        var toP = document.getElementById('addToPort')?document.getElementById('addToPort').value.trim():'红海';
+        appData.feeders.push({row:maxRow+1,name:name,pkg:dt,teu:teu,svc:svc,toPort:toP||'红海'});
+    }else{
+        var fromP = document.getElementById('addFromPort')?document.getElementById('addFromPort').value.trim():'中国各港';
+        appData.whites.push({row:maxRow+1,name:name,pkg:dt,teu:teu,svc:svc,fromPort:fromP||'中国各港'});
+    }
+
+    closeAddModal();
+    // Re-run assignment to include new ship
+    autoAssign();
+}
+
+// ========== EXPORT ==========
+function exportPlan(){
+    var totalC=0,totalD=0;
+    for(var i=0;i<appData.whites.length;i++)totalC+=appData.whites[i].teu;
+    for(var j=0;j<appData.assignments.length;j++)totalD+=appData.assignments[j].ateu;
+
+    var plan=appData.assignments.slice().sort(function(a,b){
+        return appData.whites[a.wi].pkg-appData.whites[b.wi].pkg;
+    });
+
+    var h='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>布袋船计划 v2</title>';
+    h+='<style>body{font-family:sans-serif;padding:24px;max-width:900px;margin:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}th{background:#f5f5f5}.ok{color:#2e7d32}.warn{color:#e65100}.bad{color:#c62828}</style></head><body>';
+    h+='<h1>🚢 布袋船排计划报告</h1>';
+    h+='<p>'+new Date().toLocaleDateString()+' | 文件:'+appData.fileName+' | 总货量:'+totalC+'TEU | 已安排:'+totalD+'TEU | 未安排:'+(totalC-totalD)+'TEU</p>';
+    h+='<table><thead><tr><th>#</th><th>干线船</th><th>到巴生</th><th>货量</th><th>→ 布袋船</th><th>离巴生</th><th>等天</th><th>安排TEU</th></tr></thead><tbody>';
+    for(var k=0;k<plan.length;k++){
+        var a=plan[k];var w=appData.whites[a.wi];var f=appData.feeders[a.fi];
+        var cls=a.days<=5?'ok':(a.days<=10?'warn':'bad');
+        h+='<tr><td>'+(k+1)+'</td><td>'+w.name+'</td><td>'+fmtFull(w.pkg)+'</td><td>'+w.teu+'</td><td>'+f.name+'</td><td>'+fmtFull(f.pkg)+'</td><td class="'+cls+'">'+a.days+'</td><td>'+a.ateu+'</td></tr>';
+    }
+    // Unassigned
+    var shown={};for(var u=0;u<plan.length;u++)shown[plan[u].wRow]=true;
+    for(var v=0;v<appData.whites.length;v++){
+        var uw=appData.whites[v];var un=unassignedForWhite(uw.row);
+        if(un>0){
+            h+='<tr style="background:#fff8e1"><td>-</td><td>'+uw.name+'</td><td>'+fmtFull(uw.pkg)+'</td><td>'+uw.teu+'</td>';
+            h+='<td colspan="4" style="color:#c62828">⚠ 未安排 '+un+' TEU</td></tr>';
+        }
+    }
+    h+='</tbody></table></body></html>';
+
+    var blob=new Blob([h],{type:'text/html'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='budai_plan_v2_'+Date.now()+'.html';a.click();
+    URL.revokeObjectURL(url);
+}
+
+</script>
+</body>
+</html>
