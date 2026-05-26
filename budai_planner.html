@@ -584,6 +584,15 @@ function deleteWhite(idx){
     for(var a=appData.assignments.length-1;a>=0;a--){
         if(appData.assignments[a].wRow===wRow)appData.assignments.splice(a,1);
     }
+    // Recalculate wi indices after splice shifts
+    for(var a=0;a<appData.assignments.length;a++){
+        for(var i=0;i<appData.whites.length;i++){
+            if(appData.whites[i].row===appData.assignments[a].wRow){
+                appData.assignments[a].wi=i;
+                break;
+            }
+        }
+    }
     renderAll();
 }
 
@@ -595,7 +604,26 @@ function deleteFeeder(idx){
     for(var a=appData.assignments.length-1;a>=0;a--){
         if(appData.assignments[a].fRow===fRow)appData.assignments.splice(a,1);
     }
+    // Recalculate fi indices after splice shifts
+    for(var a=0;a<appData.assignments.length;a++){
+        for(var i=0;i<appData.feeders.length;i++){
+            if(appData.feeders[i].row===appData.assignments[a].fRow){
+                appData.assignments[a].fi=i;
+                break;
+            }
+        }
+    }
     renderAll();
+}
+
+// Wrapper functions for edit buttons
+function editWhiteTeu(idx){
+    var els = document.querySelectorAll('#leftBody .edit-teu');
+    if(els[idx]) startEditTeu(els[idx], 'white', idx);
+}
+function editFeederTeu(idx){
+    var els = document.querySelectorAll('#rightBody .edit-teu');
+    if(els[idx]) startEditTeu(els[idx], 'feeder', idx);
 }
 
 function startEditTeu(el, type, idx){
@@ -809,14 +837,14 @@ function renderMidColumn(){
     // Build sorted plan by white ship ETA
     var plan = appData.assignments.slice().sort(function(a,b){
         var wa=appData.whites[a.wi],wb=appData.whites[b.wi];
-        if(!wa.pkg)return 1;if(!wb.pkg)return -1;return wa.pkg-wb.pkg;
+        if(!wa||!wa.pkg)return 1;if(!wb||!wb.pkg)return -1;return wa.pkg-wb.pkg;
     });
 
     // Date range
     var allDates=[];
     for(var i=0;i<plan.length;i++){
         var w=appData.whites[plan[i].wi];var f=appData.feeders[plan[i].fi];
-        if(w.pkg)allDates.push(w.pkg);if(f.pkg)allDates.push(f.pkg);
+        if(w&&w.pkg)allDates.push(w.pkg);if(f&&f.pkg)allDates.push(f.pkg);
     }
     allDates.sort(function(a,b){return a-b;});
     var minD=allDates[0],maxD=allDates[allDates.length-1];
@@ -843,6 +871,7 @@ function renderMidColumn(){
     for(var k=0;k<plan.length;k++){
         var a=plan[k];
         var w=appData.whites[a.wi];var f=appData.feeders[a.fi];
+        if(!w||!f)continue;
 
         // Wait time class
         var wc='wait-ok';if(a.days>5)wc='wait-warn';if(a.days>10)wc='wait-bad';
@@ -1110,6 +1139,7 @@ function exportPlan(){
     h+='<table><thead><tr><th>#</th><th>干线船</th><th>到巴生</th><th>货量</th><th>→ 布袋船</th><th>离巴生</th><th>等天</th><th>安排TEU</th></tr></thead><tbody>';
     for(var k=0;k<plan.length;k++){
         var a=plan[k];var w=appData.whites[a.wi];var f=appData.feeders[a.fi];
+        if(!w||!f)continue;
         var cls=a.days<=5?'ok':(a.days<=10?'warn':'bad');
         h+='<tr><td>'+(k+1)+'</td><td>'+w.name+'</td><td>'+fmtFull(w.pkg)+'</td><td>'+w.teu+'</td><td>'+f.name+'</td><td>'+fmtFull(f.pkg)+'</td><td class="'+cls+'">'+a.days+'</td><td>'+a.ateu+'</td></tr>';
     }
