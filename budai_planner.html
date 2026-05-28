@@ -165,6 +165,9 @@ h1{font-size:20px;margin-bottom:2px}
 <!-- Stats -->
 <div class="stats-bar" id="statsBar" style="display:none"></div>
 
+<!-- Active filter chip -->
+<div id="filterChip" style="display:none;padding:6px 14px;background:#e3f2fd;border:1px solid #90caf9;border-radius:20px;font-size:12px;color:#1565c0;margin-bottom:10px;width:fit-content"></div>
+
 <!-- Toolbar -->
 <div class="toolbar" id="toolbar" style="display:none">
 <button class="btn btn-orange" onclick="autoAssign()">🤖 自动排船</button>
@@ -172,6 +175,12 @@ h1{font-size:20px;margin-bottom:2px}
 <button class="btn btn-blue" onclick="showAddModal('feeder')">➕ 添加布袋船</button>
 <button class="btn btn-blue" onclick="showAddModal('white')">➕ 添加干线船</button>
 <button class="btn btn-green" onclick="exportPlan()">📥 导出计划</button>
+<span style="color:#888;font-size:12px;margin-left:8px">| 到巴生:</span>
+<input type="date" id="filterFrom" style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;width:128px" title="起始日期">
+<span style="font-size:12px;color:#888">→</span>
+<input type="date" id="filterTo" style="padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;width:128px" title="截止日期">
+<button class="btn btn-blue btn-sm" onclick="applyDateFilter()">🔍 筛选</button>
+<button class="btn btn-sm" onclick="clearDateFilter()" style="background:#eee;color:#555">✕ 清除</button>
 </div>
 
 <!-- ===== PIPELINE: THREE COLUMNS ===== -->
@@ -179,7 +188,7 @@ h1{font-size:20px;margin-bottom:2px}
 
 <!-- LEFT: China → PKG -->
 <div class="col-left">
-<div class="col-header col-left-header">🇨🇳 干线船 · 中国到巴生</div>
+<div class="col-header col-left-header">🇨🇳 干线船 · 中国到巴生 <span id="leftCount" style="font-weight:normal;opacity:0.8;font-size:12px"></span></div>
 <div class="col-body" id="leftBody">
 <p style="color:#999;padding:20px;text-align:center">加载中...</p>
 </div>
@@ -187,7 +196,7 @@ h1{font-size:20px;margin-bottom:2px}
 
 <!-- MIDDLE: PKG Hub -->
 <div class="col-mid">
-<div class="col-header col-middle-header" style="background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff">🔄 巴生中转港 PKG · 衔接时间轴</div>
+<div class="col-header col-middle-header" style="background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff">🔄 巴生中转港 PKG · 衔接时间轴 <span id="midCount" style="font-weight:normal;opacity:0.8;font-size:12px"></span></div>
 <div class="col-body" id="midBody">
 <p style="color:#999;padding:20px;text-align:center">加载中...</p>
 </div>
@@ -195,7 +204,7 @@ h1{font-size:20px;margin-bottom:2px}
 
 <!-- RIGHT: PKG → Red Sea -->
 <div class="col-right">
-<div class="col-header col-right-header">🔴 布袋船 · 巴生到红海</div>
+<div class="col-header col-right-header">🔴 布袋船 · 巴生到红海 <span id="rightCount" style="font-weight:normal;opacity:0.8;font-size:12px"></span></div>
 <div class="col-body" id="rightBody">
 <p style="color:#999;padding:20px;text-align:center">加载中...</p>
 </div>
@@ -226,18 +235,29 @@ var appData = {
     feeders: [],
     pinks: [],
     assignments: [],
-    fileName: ''
+    fileName: '',
+    dateFrom: null,  // PKG ETA range filter (Date object)
+    dateTo: null
 };
 var nextMatchId = 1;
 
 // ========== UTILITIES ==========
 function parseDate(val) {
     if (!val) return null;
-    var s = String(val).trim();
-    if (s.length === 10 && s.indexOf('-') > 0) return new Date(s + 'T00:00:00');
-    if (s.length >= 19) return new Date(s.substring(0,19).replace(/ /,'T'));
+    // Direct Date object (from cellDates:true or new Date())
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    // Excel serial number (e.g. 46022 when raw:true without cellDates)
     var n = Number(val);
     if (!isNaN(n) && n > 25000 && n < 60000) { return new Date((n - 25569) * 86400000); }
+    // String date: "2026-05-25"
+    var s = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00');
+    // String date: "2026/05/25" or "05/25/2026"
+    var m = s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    // Try native parse as last resort
+    var ds = new Date(s);
+    if (!isNaN(ds.getTime())) return ds;
     return null;
 }
 
@@ -268,30 +288,30 @@ function matchColor(id){return matchColors[(id-1)%matchColors.length];}
 // ========== LOAD DEMO DATA ==========
 function loadDemo() {
     appData.whites = [
-        {row:51,name:'ZHI YING HE SHUN',pkg:new Date('2026-06-07'),teu:1100,svc:'SGX',fromPort:'中国各港'},
-        {row:53,name:'FUYU',pkg:new Date('2026-06-14'),teu:800,svc:'SGX',fromPort:'中国各港'},
-        {row:54,name:'PEAFORCE',pkg:new Date('2026-06-16'),teu:520,svc:'REX',fromPort:'中国各港'},
-        {row:56,name:'HUA DONG 811',pkg:new Date('2026-06-18'),teu:1080,svc:'REX',fromPort:'中国各港'},
-        {row:59,name:'RACINE',pkg:new Date('2026-06-22'),teu:5500,svc:'AEM',fromPort:'中国各港'},
-        {row:63,name:'KAI DA HONG ZHOU',pkg:new Date('2026-06-18'),teu:950,svc:'SGX',fromPort:'中国各港'},
-        {row:65,name:'ZYHS',pkg:new Date('2026-06-29'),teu:1100,svc:'SGX',fromPort:'中国各港'},
-        {row:67,name:'FUYU',pkg:new Date('2026-07-04'),teu:800,svc:'SGX',fromPort:'中国各港'},
-        {row:68,name:'HUA DONG 811',pkg:new Date('2026-07-08'),teu:1080,svc:'REX',fromPort:'中国各港'},
-        {row:69,name:'KAI DA HONG ZHOU',pkg:new Date('2026-07-08'),teu:950,svc:'SGX',fromPort:'中国各港'},
-        {row:71,name:'ZHI YING HE SHUN',pkg:new Date('2026-07-17'),teu:1100,svc:'SGX',fromPort:'中国各港'},
-        {row:75,name:'HUA DONG 811',pkg:new Date('2026-07-30'),teu:1080,svc:'REX',fromPort:'中国各港'},
-        {row:76,name:'KAI DA HONG ZHOU',pkg:new Date('2026-07-25'),teu:950,svc:'SGX',fromPort:'中国各港'},
-        {row:77,name:'FUYU',pkg:new Date('2026-07-24'),teu:800,svc:'SGX',fromPort:'中国各港'}
+        {row:51,name:'ZHI YING HE SHUN',pkg:new Date(2026,5,7),teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:53,name:'FUYU',pkg:new Date(2026,5,14),teu:800,svc:'SGX',fromPort:'中国各港'},
+        {row:54,name:'PEAFORCE',pkg:new Date(2026,5,16),teu:520,svc:'REX',fromPort:'中国各港'},
+        {row:56,name:'HUA DONG 811',pkg:new Date(2026,5,18),teu:1080,svc:'REX',fromPort:'中国各港'},
+        {row:59,name:'RACINE',pkg:new Date(2026,5,22),teu:5500,svc:'AEM',fromPort:'中国各港'},
+        {row:63,name:'KAI DA HONG ZHOU',pkg:new Date(2026,5,18),teu:950,svc:'SGX',fromPort:'中国各港'},
+        {row:65,name:'ZYHS',pkg:new Date(2026,5,29),teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:67,name:'FUYU',pkg:new Date(2026,6,4),teu:800,svc:'SGX',fromPort:'中国各港'},
+        {row:68,name:'HUA DONG 811',pkg:new Date(2026,6,8),teu:1080,svc:'REX',fromPort:'中国各港'},
+        {row:69,name:'KAI DA HONG ZHOU',pkg:new Date(2026,6,8),teu:950,svc:'SGX',fromPort:'中国各港'},
+        {row:71,name:'ZHI YING HE SHUN',pkg:new Date(2026,6,17),teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:75,name:'HUA DONG 811',pkg:new Date(2026,6,30),teu:1080,svc:'REX',fromPort:'中国各港'},
+        {row:76,name:'KAI DA HONG ZHOU',pkg:new Date(2026,6,25),teu:950,svc:'SGX',fromPort:'中国各港'},
+        {row:77,name:'FUYU',pkg:new Date(2026,6,24),teu:800,svc:'SGX',fromPort:'中国各港'}
     ];
     appData.feeders = [
-        {row:52,name:'MAO GANG SHANG HAI',pkg:new Date('2026-06-11'),teu:1150,svc:'SGX',toPort:'SOKHNA'},
-        {row:57,name:'TIGER LONGKOU',pkg:new Date('2026-06-17'),teu:1350,svc:'',toPort:'JEDDAH'},
-        {row:64,name:'CUL YANGPU',pkg:new Date('2026-06-21'),teu:1600,svc:'REX',toPort:'SOKHNA'},
-        {row:66,name:'HAIAN MIND',pkg:new Date('2026-07-03'),teu:1450,svc:'',toPort:'JEDDAH'},
-        {row:70,name:'HONG DA XIN 728',pkg:new Date('2026-07-13'),teu:1700,svc:'REX',toPort:'SOKHNA'},
-        {row:72,name:'MAO GANG SHANG HAI',pkg:new Date('2026-07-19'),teu:1150,svc:'SGX',toPort:'SOKHNA'},
-        {row:73,name:'TIGER LONGKOU',pkg:new Date('2026-07-25'),teu:1350,svc:'',toPort:'JEDDAH'},
-        {row:74,name:'CUL YANGPU',pkg:new Date('2026-07-25'),teu:1600,svc:'REX',toPort:'SOKHNA'},
+        {row:52,name:'MAO GANG SHANG HAI',pkg:new Date(2026,5,11),teu:1150,svc:'SGX',toPort:'SOKHNA'},
+        {row:57,name:'TIGER LONGKOU',pkg:new Date(2026,5,17),teu:1350,svc:'',toPort:'JEDDAH'},
+        {row:64,name:'CUL YANGPU',pkg:new Date(2026,5,21),teu:1600,svc:'REX',toPort:'SOKHNA'},
+        {row:66,name:'HAIAN MIND',pkg:new Date(2026,6,3),teu:1450,svc:'',toPort:'JEDDAH'},
+        {row:70,name:'HONG DA XIN 728',pkg:new Date(2026,6,13),teu:1700,svc:'REX',toPort:'SOKHNA'},
+        {row:72,name:'MAO GANG SHANG HAI',pkg:new Date(2026,6,19),teu:1150,svc:'SGX',toPort:'SOKHNA'},
+        {row:73,name:'TIGER LONGKOU',pkg:new Date(2026,6,25),teu:1350,svc:'',toPort:'JEDDAH'},
+        {row:74,name:'CUL YANGPU',pkg:new Date(2026,6,25),teu:1600,svc:'REX',toPort:'SOKHNA'},
         {row:78,name:'TB JINJIANG',pkg:null,teu:1200,svc:'',toPort:'SOKHNA',note:'TBC'},
         {row:79,name:'TENTATIVE ROTATION',pkg:null,teu:0,svc:'',toPort:'—',note:'TBC'}
     ];
@@ -341,23 +361,28 @@ document.getElementById('jsonInput').addEventListener('change',function(e){
 // Load parsed JSON from Python script
 function loadJSONData(data, fname){
     appData.whites = (data.whites||[]).map(function(s){
-        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',pkge:s.pkge?parseDate(s.pkge):null,
+        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',
                 teu:s.teu||0,dischargeVol:s.dischargeVol||0,svc:s.svc||'',color:s.color||'00000000',
-                fromPort:s.pol||s.fromPort||'中国各港',toPort:s.pod||s.toPort||'',_type:s.type||'W'};
+                fromPort:s.fromPort||s.pol||'中国各港',toPort:s.toPort||s.pod||'',_type:s.type||'W',
+                classifiedBy:s.classifiedBy||''};
     });
     appData.feeders = (data.feeders||[]).map(function(s){
-        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',pkge:s.pkge?parseDate(s.pkge):null,
+        return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',
                 teu:s.teu||0,svc:s.svc||'',color:s.color||'FBE2D5',
-                toPort:s.pod||s.toPort||'红海',fromPort:'巴生PKG',_type:'F'};
+                toPort:s.toPort||s.pod||'红海',fromPort:'巴生PKG',_type:'F',
+                classifiedBy:s.classifiedBy||''};
     });
     appData.pinks = (data.pinks||[]).map(function(s){
         return {row:s.row,name:s.name,pkg:s.pkg?parseDate(s.pkg):null,pkgStr:s.pkg||'',teu:s.teu||0,
-                svc:s.svc||'',color:s.color||'',fromPort:s.fromPort||'中国各港',toPort:s.toPort||'红海',_type:'P'};
+                svc:s.svc||'',color:s.color||'',fromPort:s.fromPort||'中国各港',toPort:s.toPort||'红海(直达)',_type:'P',
+                classifiedBy:s.classifiedBy||''};
     });
 
     var summary = data.summary||{};
+    var cs = summary.classifiedBy||{};
     document.getElementById('fileName').textContent='✅ 已加载: '+(fname||'JSON')+
-        ' | 干线'+appData.whites+' 布袋'+appData.feeders.length+' 直航'+appData.pinks.length;
+        ' | 干线:'+appData.whites.length+' 布袋:'+appData.feeders.length+' 直航:'+appData.pinks.length+
+        ' | 航线规则:'+(cs.SVC||0)+' 颜色:'+(cs.color||0)+' 未知:'+(cs.unknown||0);
 
     // Show hint about parse_excel.py only for Excel uploads
     document.getElementById('parseHint').style.display='none';
@@ -449,24 +474,22 @@ function readFile(file){
     var r = new FileReader();
     r.onload = function(e){
         try{
-            var wb = XLSX.read(e.target.result,{type:'array',cellDates:true,dateNF:'yyyy-mm-dd'});
+            var wb = XLSX.read(e.target.result,{type:'array',cellStyles:true,cellDates:true,dateNF:'yyyy-mm-dd'});
             parseWorkbook(wb);
             appData.fileName=file.name;
 
-            // Check if colors were detected
-            var hasColor=false;
-            for(var i=0;i<appData.whites.length;i++){if(appData.whites[i].color && appData.whites[i].color!=='00000000'){hasColor=true;break;}}
-            for(var j=0;j<appData.feeders.length;j++){if(appData.feeders[j].length>0){hasColor=true;break;}}
-
-            var msg='⚠️ '+file.name+' (SheetJS直接解析，颜色可能不准)';
-            if(appData.feeders.length===0)msg+=' | 未检测到布袋船，请点击「🏷️ 手动分类」标记';
+            var stats = appData._parseStats || {};
+            var msg = '✅ '+file.name+' ('+appData._sheetName+') | 干线:'+appData.whites.length+' | 布袋:'+appData.feeders.length+' | 直航:'+appData.pinks.length;
+            if(stats.svcHits>0) msg += ' | 航线规则:'+stats.svcHits+'条';
+            if(stats.colorHits>0) msg += ' | 颜色回退:'+stats.colorHits+'条';
+            if(stats.unknowns>0) msg += ' | ⚠️ '+stats.unknowns+'条未知需手动分类';
             document.getElementById('fileName').textContent=msg;
 
             nextMatchId=1;
             autoAssign();
 
-            // Auto-show classify wizard if no feeders detected
-            if(appData.feeders.length===0 && appData.whites.length>0){
+            // Auto-show classify wizard if unknowns exist
+            if(stats.unknowns>0 || appData.feeders.length===0){
                 setTimeout(function(){showClassifyWizard();},500);
             }
         }catch(err){
@@ -477,57 +500,243 @@ function readFile(file){
     r.readAsArrayBuffer(file);
 }
 
+// Known Chinese port codes (before PKG in sheet layout)
+var CHN_PORT_CODES = ['TXG','TAO','SHA','SHK','XMN','NAS','NGB','CKG','WHC'];
+// Known Red Sea port codes (after PKG in sheet layout)
+var RED_PORT_CODES = ['SOK','JED','MUN','AQJ','KHI','PSD','ADE','HOD','DJJ'];
+
 function parseWorkbook(wb){
-    var sheetName = wb.SheetNames[0];
-    var ws = wb.Sheets[sheetName];
-    var data = XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    // ====== Step 1: Auto-detect the BEST sheet ======
+    // Priority: sheet with CUL VESSELS AND most cells. Prefer sheets with recent month names.
+    var candidates=[];
+    for(var si=0;si<wb.SheetNames.length;si++){
+        var sn = wb.SheetNames[si];
+        var ws = wb.Sheets[sn];
+        if(!ws || !ws['!ref'])continue;
+        var hasCUL=false, cellCount=0;
+        var keys = Object.keys(ws).filter(function(k){return k[0]!=='!'});
+        for(var ki=0;ki<keys.length;ki++){
+            var cell = ws[keys[ki]];
+            var val = cell ? String(cell.w || cell.v || '') : '';
+            if(val.toUpperCase().indexOf('CUL VESSELS')>=0)hasCUL=true;
+            cellCount++;
+        }
+        if(hasCUL){
+            // Score: prefer recent months, exclude draft/review sheets
+            var snLower = sn.toLowerCase();
+            var isDraft = snLower.indexOf('review')>=0 || snLower.indexOf('option')>=0 || snLower.indexOf('draft')>=0 || snLower.indexOf('tentative')>=0;
+            var monthScore = 0;
+            if(snLower.indexOf('may')>=0) monthScore=5;
+            else if(snLower.indexOf('apr')>=0) monthScore=4;
+            else if(snLower.indexOf('mar')>=0) monthScore=3;
+            else if(snLower.indexOf('jun')>=0) monthScore=2;
+            candidates.push({name:sn, ws:ws, cells:cellCount, monthScore:monthScore, isDraft:isDraft});
+        }
+    }
+    if(candidates.length===0){alert('未找到含CUL VESSELS表头的Sheet');return;}
+
+    // Sort: not-draft first, then month desc, then cells desc
+    candidates.sort(function(a,b){
+        if(a.isDraft !== b.isDraft) return a.isDraft ? 1 : -1;
+        if(b.monthScore !== a.monthScore) return b.monthScore - a.monthScore;
+        return b.cells - a.cells;
+    });
+    var bestName=candidates[0].name, bestWs=candidates[0].ws;
+
+    // ====== Step 2: Read data ======
+    var data = XLSX.utils.sheet_to_json(bestWs,{header:1,defval:'',raw:true});
+
+    // ====== Step 3: Find header row containing "CUL VESSELS" ======
     var hdrRow = -1;
     for(var i=0;i<data.length;i++){
         var rowStr = JSON.stringify(data[i]).toUpperCase();
         if(rowStr.indexOf('CUL VESSELS')>=0){hdrRow=i;break;}
     }
     if(hdrRow<0){alert('找不到表头(CUL VESSELS列)');return;}
+
+    // Read headers
     var headers = [];
     for(var c=0;c<data[hdrRow].length;c++){
         headers.push(String(data[hdrRow][c]||'').trim().toUpperCase());
     }
-    function colIdx(name){return headers.indexOf(name.toUpperCase());};
-    var pkgCol = colIdx('PKG');
-    var teuCol = colIdx('EFF. TEUS');
-    var vesCol = colIdx('CUL VESSELS');
-    var svcCol = colIdx('SERVICES');
+    function colIdx(name){
+        var n = name.toUpperCase();
+        for(var ci=0;ci<headers.length;ci++){if(headers[ci]===n)return ci;}
+        // Fuzzy match
+        for(var ci=0;ci<headers.length;ci++){if(headers[ci].indexOf(n)>=0)return ci;}
+        return -1;
+    };
 
+    var vesCol = colIdx('CUL VESSELS');
+    var svcCol = colIdx('SERVICE'); // Matches 'SERVICES' too (indexOf)
+    var teuCol = colIdx('EFF. TEUS');
+    var pkgCol = colIdx('PKG');
+    if(vesCol<0){alert('找不到CUL VESSELS列');return;}
+
+    console.log('Selected sheet: '+bestName+' | hdrRow:'+hdrRow+' | vesCol:'+vesCol+' svcCol:'+svcCol+' teuCol:'+teuCol+' pkgCol:'+pkgCol);
+
+    // ====== Step 4: Identify Chinese & Red Sea port columns ======
+    var chnCols = [], redCols = [];
+    for(var c=0;c<headers.length;c++){
+        var hClean = headers[c].replace(/[^A-Z]/g,'');
+        if(!hClean)continue;
+        // Check against Chinese port codes: must be BEFORE PKG
+        var isChn=false;
+        for(var k=0;k<CHN_PORT_CODES.length;k++){
+            if(hClean===CHN_PORT_CODES[k] && pkgCol>=0 && c<pkgCol){isChn=true;break;}
+        }
+        if(isChn){chnCols.push(c);continue;}
+        // Check against Red Sea port codes: must be AFTER PKG
+        var isRed=false;
+        for(var j=0;j<RED_PORT_CODES.length;j++){
+            if(hClean===RED_PORT_CODES[j] && pkgCol>=0 && c>pkgCol){isRed=true;break;}
+        }
+        // Also check headers containing KHI/AQJ
+        if(!isRed && pkgCol>=0 && c>pkgCol){
+            if(headers[c].indexOf('KHI')>=0||headers[c].indexOf('AQJ')>=0)isRed=true;
+        }
+        if(isRed){redCols.push(c);}
+    }
+
+    function hasPortDate(row, cols){
+        if(!row)return false;
+        for(var pi=0;pi<cols.length;pi++){
+            var v = row[cols[pi]];
+            if(!v||v==='')continue;
+            if(parseDate(v))return true;
+        }
+        return false;
+    }
+
+    // ====== Step 5: Parse and classify each ship ======
+    // Classification logic:
+    //   Priority 1: SERVICE lane (SGX→干线, REX→check port dates)
+    //   Priority 2: Cell color (DAF2D0→直航, FBE2D5→布袋, blank→干线)
+    //   Priority 3: Unknown → manual classification
     appData.whites=[];appData.feeders=[];appData.pinks=[];
+    var statSvc=0, statColor=0, statUnknown=0;
+    var unclassifiedRows=[];
+
     for(var r=hdrRow+1;r<data.length;r++){
         var row = data[r];if(!row)continue;
         var v = String(row[vesCol]||'').trim();
         if(!v)continue;
+
         var pkgDt = parseDate(row[pkgCol]);
-        var teuNum = isNaN(Number(row[teuCol]))?0:Number(row[teuCol]);
-        var svc = String(row[svcCol]||'');
-        var color = getCellColor(ws, hdrRow+1+r, vesCol+1);
-        var ct = classifyColor(color);
-        var entry={row:r+1,name:v,pkg:pkgDt,teu:teuNum,svc:svc,color:color,fromPort:'中国各港',toPort:'红海'};
-        if(ct==='W')appData.whites.push(entry);
-        else if(ct==='F')appData.feeders.push(entry);
-        else if(ct==='P')appData.pinks.push(entry);
+        var teuRaw = row[teuCol];
+        var teuNum = 0;
+        if(typeof teuRaw==='number')teuNum=teuRaw;
+        else if(typeof teuRaw==='string'){
+            var n=parseInt(teuRaw);if(!isNaN(n))teuNum=n;
+        }
+
+        var svc = svcCol>=0 ? String(row[svcCol]||'').toUpperCase().trim() : '';
+        var color = getCellColor(bestWs, r+1, vesCol+1);
+        var ct = '', classifiedBy = '';
+
+        // ---- Classification: SERVICE priority, color as fallback ----
+        if(svc.indexOf('SGX')>=0){
+            // SGX → 干线船 (中国到巴生)
+            ct='W'; statSvc++; classifiedBy='SVC:SGX→干线';
+        } else if(svc.indexOf('REX')>=0){
+            // REX → 区分直达红海 vs 布袋(巴生→红海)
+            var hasChn = hasPortDate(row, chnCols);
+            var hasRed = hasPortDate(row, redCols);
+            if(hasChn && hasRed){
+                ct='P'; classifiedBy='SVC:REX→直航(中+红)';
+            } else if(!hasChn && hasRed){
+                ct='F'; classifiedBy='SVC:REX→布袋(仅红)';
+            } else if(hasChn && !hasRed){
+                ct='W'; classifiedBy='SVC:REX→干线(仅中)';
+            } else {
+                ct='W'; classifiedBy='SVC:REX→干线(无日期)';
+            }
+            statSvc++;
+        } else if(svc !== ''){
+            // Other service lanes (AEM, RES, CGX etc.) → TBC ships, best effort
+            var cc = classifyColor(color);
+            if(cc==='P'||cc==='F'){
+                ct=cc; statColor++; classifiedBy='color:'+color+' [svc:'+svc+']';
+            } else {
+                // Unknown service lane + no meaningful color → mark as unknown
+                ct='?'; statUnknown++; classifiedBy='unknown [svc:'+svc+']';
+                unclassifiedRows.push(r+1);
+            }
+        } else {
+            // No SERVICE lane → fallback: color if available, else default 干线(W)
+            var cc2 = classifyColor(color);
+            if(cc2==='P'||cc2==='F'){
+                // Color clearly indicates feeder/direct
+                ct=cc2; statColor++; classifiedBy='color:'+color;
+            } else if(cc2==='W'){
+                // White cell → likely 干线 (most common case)
+                ct='W'; statColor++; classifiedBy='color:白→干线';
+            } else {
+                // Color unreadable (browser SheetJS limitation) → default to 干线
+                // User can manually re-classify via wizard if wrong
+                ct='W'; statUnknown++; classifiedBy='fallback:无颜色→默认干线';
+                unclassifiedRows.push(r+1);
+            }
+        }
+
+        var entry={row:r+1,name:v,pkg:pkgDt,teu:teuNum,svc:svc||'',color:color,classifiedBy:classifiedBy};
+        if(ct==='W'){
+            entry.fromPort='中国各港'; entry.toPort='红海';
+            appData.whites.push(entry);
+        } else if(ct==='F'){
+            entry.fromPort='巴生PKG'; entry.toPort='红海';
+            appData.feeders.push(entry);
+        } else if(ct==='P'){
+            entry.fromPort='中国各港'; entry.toPort='红海(直达)';
+            appData.pinks.push(entry);
+        } else {
+            entry.fromPort='中国各港'; entry.toPort='红海';
+            appData.whites.push(entry);
+        }
     }
+
+    appData._parseStats = {
+        svcHits:statSvc, colorHits:statColor, unknowns:statUnknown,
+        total:appData.whites.length+appData.feeders.length+appData.pinks.length
+    };
+    appData._sheetName = bestName;
+    console.log('Parse done: svc='+statSvc+' color='+statColor+' unknown='+statUnknown+
+        ' | W:'+appData.whites.length+' F:'+appData.feeders.length+' P:'+appData.pinks.length);
 }
 
+// Enhanced color reading: try multiple paths available in SheetJS
 function getCellColor(ws, r, c){
     try{
         var addr = XLSX.utils.encode_cell({r:r-1,c:c-1});
         var cell = ws[addr];
-        if(!cell||!cell.s)return '00000000';
-        if(cell.s.fgColor&&cell.s.fgColor.rgb)return String(cell.s.fgColor.rgb).toUpperCase();
+        if(!cell)return '00000000';
+
+        // Path 1: cell.s (style object with fgColor)
+        if(cell.s){
+            if(cell.s.fgColor && cell.s.fgColor.rgb)
+                return String(cell.s.fgColor.rgb).toUpperCase();
+            if(cell.s.bgColor && cell.s.bgColor.rgb)
+                return String(cell.s.bgColor.rgb).toUpperCase();
+            if(cell.s.fill && cell.s.fill.fgColor && cell.s.fill.fgColor.rgb)
+                return String(cell.s.fill.fgColor.rgb).toUpperCase();
+            if(cell.s.patternType) return ''+cell.s.patternType;
+        }
+
+        // Path 2: Try to access the XML-based styles (works in some SheetJS builds)
+        if(cell.w) return '00000000'; // has text value but no style = white
+
         return '00000000';
     }catch(e){return '00000000';}
 }
 
 function classifyColor(rgb){
-    if(!rgb||rgb==='00000000'||rgb==='FFFFFFFF')return 'W';
-    if(rgb.indexOf('DAF2D0')>=0)return 'P';
-    if(rgb.indexOf('FBE2D5')>=0)return 'F';
+    if(!rgb||rgb==='00000000'||rgb==='FFFFFFFF'||rgb==='000000')return 'W';  // White → 干线
+    var r = rgb.toUpperCase().replace(/^FF/,'');
+
+    if(r.indexOf('DAF2D0')>=0) return 'P';   // Light green → 直航(中国直达红海)
+    if(r.indexOf('FBE2D5')>=0) return 'F';   // Light pink/orange → 布袋(巴生→红海)
+
+    // Other colors → unknown, needs manual classification
     return '?';
 }
 
@@ -664,22 +873,27 @@ function fmtDateInput(d){
 }
 
 function startEditDate(el, type, idx){
-    if(el.tagName==='INPUT')return;
+    if(el.querySelector('input'))return; // already editing
     var oldVal = el.getAttribute('data-val') || '';
     var inp = document.createElement('input');
     inp.type='date';
     inp.value=oldVal;
     inp.style.cssText='padding:2px 4px;border:1px solid #1565c0;border-radius:3px;font-size:12px;font-weight:600;cursor:pointer';
-    inp.addEventListener('change', function(){
-        saveEditDate(type, idx, this.value);
-    });
+    var saved = false;
+    function doSave(){
+        if(saved) return;
+        saved = true;
+        saveEditDate(type, idx, inp.value);
+    }
+    inp.addEventListener('change', doSave);
+    inp.addEventListener('blur', doSave);
     inp.addEventListener('keydown', function(e){
-        if(e.key==='Escape'){renderAll();return;}
+        if(e.key==='Enter'){ doSave(); return; }
+        if(e.key==='Escape'){ saved=true; renderAll(); return; }
     });
     el.innerHTML='';
     el.appendChild(inp);
     inp.focus();
-    if(oldVal)inp.select();
 }
 
 function saveEditDate(type, idx, val){
@@ -740,6 +954,67 @@ function renderAll(){
     document.getElementById('summarySection').style.display='';
 }
 
+// ========== DATE RANGE FILTER ==========
+function applyDateFilter(){
+    var fromEl = document.getElementById('filterFrom');
+    var toEl = document.getElementById('filterTo');
+    // Use local midnight (consistent with parseDate which uses new Date(y,m,d))
+    var dp;
+    if(fromEl.value){
+        dp=fromEl.value.split('-'); appData.dateFrom=new Date(parseInt(dp[0]),parseInt(dp[1])-1,parseInt(dp[2]));
+    } else { appData.dateFrom=null; }
+    if(toEl.value){
+        dp=toEl.value.split('-'); appData.dateTo=new Date(parseInt(dp[0]),parseInt(dp[1])-1,parseInt(dp[2]));
+    } else { appData.dateTo=null; }
+
+    if(appData.dateFrom && appData.dateTo && appData.dateFrom > appData.dateTo){
+        alert('起始日期不能晚于截止日期');
+        return;
+    }
+
+    // Update filter inputs visual state
+    fromEl.style.borderColor = appData.dateFrom ? '#1565c0' : '#ccc';
+    toEl.style.borderColor = appData.dateTo ? '#1565c0' : '#ccc';
+
+    // Show filter chip
+    var f = appData.dateFrom ? fmtFull(appData.dateFrom) : '任意';
+    var t = appData.dateTo ? fmtFull(appData.dateTo) : '任意';
+    var chip = document.getElementById('filterChip');
+    if(appData.dateFrom||appData.dateTo){
+        chip.style.display='inline-block';
+        chip.textContent='📅 '+f+' → '+t+' 到巴生';
+    } else {
+        chip.style.display='none';
+    }
+
+    renderAll();
+}
+
+function clearDateFilter(){
+    appData.dateFrom = null;
+    appData.dateTo = null;
+    document.getElementById('filterFrom').value = '';
+    document.getElementById('filterTo').value = '';
+    document.getElementById('filterFrom').style.borderColor = '#ccc';
+    document.getElementById('filterTo').style.borderColor = '#ccc';
+    document.getElementById('filterChip').style.display = 'none';
+    renderAll();
+}
+
+// Helper: check if a ship passes the date filter
+function passesDateFilter(ship){
+    if(!appData.dateFrom && !appData.dateTo) return true;
+    if(!ship.pkg) return false; // ships without PKG date: hide when filter is active
+    if(appData.dateFrom && ship.pkg < appData.dateFrom) return false;
+    if(appData.dateTo){
+        // Include full day: PKG date <= dateTo end of day
+        var endOfDay = new Date(appData.dateTo);
+        endOfDay.setHours(23,59,59,999);
+        if(ship.pkg > endOfDay) return false;
+    }
+    return true;
+}
+
 // --- Stats ---
 function renderStats(){
     var totalCargo=0;
@@ -761,15 +1036,21 @@ function renderStats(){
 // --- LEFT COLUMN: Mainline Ships ---
 function renderLeftColumn(){
     var html='';
+    var shownCount = 0;
+    var totalCount = appData.whites.length;
 
-    if(appData.whites.length===0){
+    if(totalCount===0){
         html='<p style="color:#999;padding:20px;text-align:center">暂无干线船数据</p>';
         document.getElementById('leftBody').innerHTML=html;
+        document.getElementById('leftCount').textContent='';
         return;
     }
 
-    for(var i=0;i<appData.whites.length;i++){
+    for(var i=0;i<totalCount;i++){
         var w = appData.whites[i];
+        // Date range filter
+        if(!passesDateFilter(w)) continue;
+        shownCount++;
         var assigns = assignmentsForWhite(w.row);
         var doneTeu = 0;
         for(var a=0;a<assigns.length;a++)doneTeu+=assigns[a].ateu;
@@ -822,7 +1103,19 @@ function renderLeftColumn(){
         html+='</div>'; // end card
     }
 
+    // Show all-filtered message
+    if(shownCount===0 && totalCount>0 && (appData.dateFrom||appData.dateTo)){
+        html='<p style="color:#999;padding:20px;text-align:center">该时段无到港干线船</p>';
+    }
+
     document.getElementById('leftBody').innerHTML=html;
+    // Update header count
+    var lc = document.getElementById('leftCount');
+    if(appData.dateFrom||appData.dateTo){
+        lc.textContent = '(' + shownCount + '/' + totalCount + ')';
+    } else {
+        lc.textContent = '';
+    }
 }
 
 // --- MIDDLE COLUMN: Connection Timeline ---
@@ -834,17 +1127,30 @@ function renderMidColumn(){
         return;
     }
 
-    // Build sorted plan by white ship ETA
-    var plan = appData.assignments.slice().sort(function(a,b){
+    // Filter plan: show connection only if BOTH white AND feeder PKG dates are in range
+    var isFilterActive = !!(appData.dateFrom||appData.dateTo);
+    var plan = appData.assignments.slice();
+    if(isFilterActive){
+        plan = plan.filter(function(a){
+            var w=appData.whites[a.wi], f=appData.feeders[a.fi];
+            return w && f && passesDateFilter(w) && passesDateFilter(f);
+        });
+    }
+    // Sort by white ship ETA
+    plan.sort(function(a,b){
         var wa=appData.whites[a.wi],wb=appData.whites[b.wi];
         if(!wa||!wa.pkg)return 1;if(!wb||!wb.pkg)return -1;return wa.pkg-wb.pkg;
     });
 
-    // Date range
+    // Time axis: use only filtered plan's dates (or filter bounds if active)
     var allDates=[];
     for(var i=0;i<plan.length;i++){
-        var w=appData.whites[plan[i].wi];var f=appData.feeders[plan[i].fi];
-        if(w&&w.pkg)allDates.push(w.pkg);if(f&&f.pkg)allDates.push(f.pkg);
+        var wd=appData.whites[plan[i].wi];var fd=appData.feeders[plan[i].fi];
+        if(wd&&wd.pkg)allDates.push(wd.pkg);if(fd&&fd.pkg)allDates.push(fd.pkg);
+    }
+    if(isFilterActive){
+        if(appData.dateFrom) allDates.push(appData.dateFrom);
+        if(appData.dateTo) allDates.push(appData.dateTo);
     }
     allDates.sort(function(a,b){return a-b;});
     var minD=allDates[0],maxD=allDates[allDates.length-1];
@@ -867,7 +1173,7 @@ function renderMidColumn(){
     }
     html+='</div>';
 
-    // Each connection row
+    // Each connection row (already filtered above, no extra check needed)
     for(var k=0;k<plan.length;k++){
         var a=plan[k];
         var w=appData.whites[a.wi];var f=appData.feeders[a.fi];
@@ -911,6 +1217,7 @@ function renderMidColumn(){
     var hasUnas=false;
     for(var v=0;v<appData.whites.length;v++){
         var uw=appData.whites[v];
+        if(!passesDateFilter(uw)) continue;
         var un=unassignedForWhite(uw.row);
         if(un>0){
             if(!hasUnas){hasUnas=true;html+='<hr style="margin:10px 0;border:0;border-top:1px dashed #ccc">';}
@@ -923,20 +1230,33 @@ function renderMidColumn(){
 
     html+='</div>'; // end timeline-area
     wrap.innerHTML=html;
+    // Update mid column count
+    var mc=document.getElementById('midCount');
+    if(mc){
+        var totalAs=appData.assignments.length;
+        if(isFilterActive){mc.textContent=' ('+plan.length+'/'+totalAs+' 组衔接)';}
+        else{mc.textContent=' ('+totalAs+' 组衔接)';}
+    }
 }
 
 // --- RIGHT COLUMN: Feeder Ships (BSA) ---
 function renderRightColumn(){
     var html='';
+    var shownCount = 0;
+    var totalCount = appData.feeders.length;
 
-    if(appData.feeders.length===0){
+    if(totalCount===0){
         html='<p style="color:#999;padding:20px;text-align:center">暂无布袋船数据</p>';
         document.getElementById('rightBody').innerHTML=html;
+        document.getElementById('rightCount').textContent='';
         return;
     }
 
-    for(var i=0;i<appData.feeders.length;i++){
+    for(var i=0;i<totalCount;i++){
         var f = appData.feeders[i];
+        // Date range filter
+        if(!passesDateFilter(f)) continue;
+        shownCount++;
         var used = usedOnFeeder(f.row);
         var left = f.teu - used;
         var pct = f.teu > 0 ? Math.round(used/f.teu*100) : 0;
@@ -995,7 +1315,19 @@ function renderRightColumn(){
         html+='</div>'; // end card
     }
 
+    // Show all-filtered message
+    if(shownCount===0 && totalCount>0 && (appData.dateFrom||appData.dateTo)){
+        html='<p style="color:#999;padding:20px;text-align:center">该时段无离港布袋船</p>';
+    }
+
     document.getElementById('rightBody').innerHTML=html;
+    // Update header count
+    var rc = document.getElementById('rightCount');
+    if(appData.dateFrom||appData.dateTo){
+        rc.textContent = '(' + shownCount + '/' + totalCount + ')';
+    } else {
+        rc.textContent = '';
+    }
 }
 
 // --- SUMMARY SECTION ---
@@ -1021,8 +1353,10 @@ function renderSummary(){
         html+='<div class="unas-list">';
         var ulist=[];
         for(var k=0;k<appData.whites.length;k++){
-            var uv=unassignedForWhite(appData.whites[k].row);
-            if(uv>0)ulist.push({ship:appData.whites[k],need:uv});
+            var sw = appData.whites[k];
+            if(!passesDateFilter(sw)) continue;
+            var uv=unassignedForWhite(sw.row);
+            if(uv>0)ulist.push({ship:sw,need:uv});
         }
         ulist.sort(function(a,b){if(!a.ship.pkg)return 1;if(!b.ship.pkg)return -1;return a.ship.pkg-b.ship.pkg;});
         for(var m=0;m<ulist.length;m++){
