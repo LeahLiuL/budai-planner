@@ -286,41 +286,45 @@ var matchColors = ['#1565c0','#2e7d32','#e65100','#7b1fa2','#c62828','#00838f','
 function matchColor(id){return matchColors[(id-1)%matchColors.length];}
 
 // ========== LOAD DEMO DATA ==========
+// 数据来源: REX & FEEDER SCHEDULE 5.28.xlsx Sheet1 Row45-76
 function loadDemo() {
     appData.whites = [
-        {row:51,name:'ZHI YING HE SHUN',pkg:new Date(2026,5,7),teu:1100,svc:'SGX',fromPort:'中国各港'},
-        {row:53,name:'FUYU',pkg:new Date(2026,5,14),teu:800,svc:'SGX',fromPort:'中国各港'},
-        {row:54,name:'PEAFORCE',pkg:new Date(2026,5,16),teu:520,svc:'REX',fromPort:'中国各港'},
-        {row:56,name:'HUA DONG 811',pkg:new Date(2026,5,18),teu:1080,svc:'REX',fromPort:'中国各港'},
-        {row:59,name:'RACINE',pkg:new Date(2026,5,22),teu:5500,svc:'AEM',fromPort:'中国各港'},
-        {row:63,name:'KAI DA HONG ZHOU',pkg:new Date(2026,5,18),teu:950,svc:'SGX',fromPort:'中国各港'},
-        {row:65,name:'ZYHS',pkg:new Date(2026,5,29),teu:1100,svc:'SGX',fromPort:'中国各港'},
-        {row:67,name:'FUYU',pkg:new Date(2026,6,4),teu:800,svc:'SGX',fromPort:'中国各港'},
-        {row:68,name:'HUA DONG 811',pkg:new Date(2026,6,8),teu:1080,svc:'REX',fromPort:'中国各港'},
-        {row:69,name:'KAI DA HONG ZHOU',pkg:new Date(2026,6,8),teu:950,svc:'SGX',fromPort:'中国各港'},
-        {row:71,name:'ZHI YING HE SHUN',pkg:new Date(2026,6,17),teu:1100,svc:'SGX',fromPort:'中国各港'},
-        {row:75,name:'HUA DONG 811',pkg:new Date(2026,6,30),teu:1080,svc:'REX',fromPort:'中国各港'},
-        {row:76,name:'KAI DA HONG ZHOU',pkg:new Date(2026,6,25),teu:950,svc:'SGX',fromPort:'中国各港'},
-        {row:77,name:'FUYU',pkg:new Date(2026,6,24),teu:800,svc:'SGX',fromPort:'中国各港'}
+        {row:45,name:'ZHI YING HE SHUN',  pkg:new Date(2026,5,7),  teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:48,name:'FUYU',               pkg:new Date(2026,5,14), teu:800, svc:'SGX',fromPort:'中国各港'},
+        {row:49,name:'PEAFORCE',           pkg:new Date(2026,5,13), teu:520, svc:'SGX',fromPort:'中国各港'},
+        {row:51,name:'HUA DONG 811',       pkg:new Date(2026,5,16), teu:1080,svc:'SGX',fromPort:'中国各港'},
+        {row:52,name:'KAI DA HONG ZHOU',   pkg:new Date(2026,5,18), teu:950, svc:'SGX',fromPort:'中国各港'},
+        {row:56,name:'RACINE',             pkg:new Date(2026,5,26), teu:5500,svc:'SGX',fromPort:'中国各港'},
+        {row:60,name:'ZYHS',               pkg:new Date(2026,5,29), teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:62,name:'FUYU',               pkg:new Date(2026,6,4),  teu:800, svc:'SGX',fromPort:'中国各港'},
+        {row:63,name:'HUA DONG 811',       pkg:new Date(2026,6,6),  teu:1080,svc:'SGX',fromPort:'中国各港'},
+        {row:65,name:'XBPL (CGX)',         pkg:new Date(2026,6,9),  teu:1000,svc:'CGX',fromPort:'中国各港'},
+        {row:66,name:'KAI DA HONG ZHOU',   pkg:new Date(2026,6,8),  teu:950, svc:'SGX',fromPort:'中国各港'},
+        {row:68,name:'ZHI YING HE SHUN',   pkg:new Date(2026,6,17), teu:1100,svc:'SGX',fromPort:'中国各港'},
+        {row:72,name:'HUA DONG 811',       pkg:new Date(2026,6,21), teu:1080,svc:'SGX',fromPort:'中国各港'},
+        {row:73,name:'KAI DA HONG ZHOU',   pkg:new Date(2026,6,24), teu:950, svc:'SGX',fromPort:'中国各港'},
+        {row:74,name:'FUYU',               pkg:new Date(2026,6,23), teu:800, svc:'SGX',fromPort:'中国各港'},
+        {row:75,name:'ZHI YING HE SHUN',   pkg:new Date(2026,7,4),  teu:1100,svc:'SGX',fromPort:'中国各港'}
     ];
     appData.feeders = [
-        {row:52,name:'MAO GANG SHANG HAI',pkg:new Date(2026,5,11),teu:1150,svc:'SGX',toPort:'SOKHNA'},
-        {row:57,name:'TIGER LONGKOU',pkg:new Date(2026,5,17),teu:1350,svc:'',toPort:'JEDDAH'},
-        {row:64,name:'CUL YANGPU',pkg:new Date(2026,5,21),teu:1600,svc:'REX',toPort:'SOKHNA'},
-        {row:66,name:'HAIAN MIND',pkg:new Date(2026,6,3),teu:1450,svc:'',toPort:'JEDDAH'},
-        {row:70,name:'HONG DA XIN 728',pkg:new Date(2026,6,13),teu:1700,svc:'REX',toPort:'SOKHNA'},
-        {row:72,name:'MAO GANG SHANG HAI',pkg:new Date(2026,6,19),teu:1150,svc:'SGX',toPort:'SOKHNA'},
-        {row:73,name:'TIGER LONGKOU',pkg:new Date(2026,6,25),teu:1350,svc:'',toPort:'JEDDAH'},
-        {row:74,name:'CUL YANGPU',pkg:new Date(2026,6,25),teu:1600,svc:'REX',toPort:'SOKHNA'},
-        {row:78,name:'TB JINJIANG',pkg:null,teu:1200,svc:'',toPort:'SOKHNA',note:'TBC'},
-        {row:79,name:'TENTATIVE ROTATION',pkg:null,teu:0,svc:'',toPort:'—',note:'TBC'}
+        {row:47,name:'MAO GANG SHANG HAI', pkg:new Date(2026,5,11), teu:1100,svc:'REX',toPort:'JEDDAH'},
+        {row:50,name:'TIGER LONGKOU',      pkg:new Date(2026,5,17), teu:1300,svc:'REX',toPort:'SOKHNA'},
+        {row:53,name:'CUL YANGPU',         pkg:new Date(2026,5,21), teu:1520,svc:'REX',toPort:'SOKHNA'},
+        {row:59,name:'HAIAN MIND',         pkg:new Date(2026,6,3),  teu:1370,svc:'REX',toPort:'SOKHNA'},
+        {row:64,name:'BZ CHONGFU',         pkg:new Date(2026,6,13), teu:5000,svc:'REX',toPort:'SOKHNA'},
+        {row:67,name:'HONG DA XIN 728',    pkg:new Date(2026,6,13), teu:1670,svc:'REX',toPort:'SOKHNA'},
+        {row:69,name:'MAO GANG SHANG HAI', pkg:new Date(2026,6,19), teu:1100,svc:'REX',toPort:'SOKHNA'},
+        {row:70,name:'TIGER LONGKOU',      pkg:new Date(2026,6,25), teu:1300,svc:'REX',toPort:'SOKHNA'},
+        {row:71,name:'CUL YANGPU',         pkg:new Date(2026,6,25), teu:1520,svc:'REX',toPort:'SOKHNA'},
+        {row:76,name:'WAN FU DA',          pkg:new Date(2026,7,2),  teu:1520,svc:'REX',toPort:'SOKHNA'}
     ];
     appData.pinks = [
-        {row:55,name:'WAN FU DA',pkg:null,teu:1600,svc:'REX'},
-        {row:58,name:'CUL HUMEN',pkg:null,teu:1050,svc:'REX'},
-        {row:60,name:'CHANG SHENG JI 8',pkg:null,teu:1650,svc:'REX'}
+        {row:46,name:'HONG DA XIN 728 (direct)',pkg:null,teu:1700,svc:'REX',toPort:'SOKHNA'},
+        {row:54,name:'CHANG SHENG JI 8',        pkg:null,teu:1650,svc:'REX',toPort:'SOKHNA'},
+        {row:55,name:'CUL HUMEN',               pkg:null,teu:1050,svc:'REX',toPort:'SOKHNA'},
+        {row:61,name:'WAN FU DA (direct)',       pkg:null,teu:1600,svc:'REX',toPort:'SOKHNA'}
     ];
-    appData.fileName = '演示数据 R51~R79';
+    appData.fileName = '演示数据 5.28 R45~R76';
     appData.assignments = [];
     nextMatchId = 1;
     document.getElementById('fileName').textContent = '✅ 已加载演示数据';
